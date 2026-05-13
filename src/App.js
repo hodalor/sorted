@@ -1,6 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { apiGet, apiPatch, apiPost } from './api';
 import BottomNav from './components/BottomNav';
+import {
+  clearFirebaseWebSession,
+  confirmPhoneVerificationCode,
+  createPhoneRecaptchaVerifier,
+  sendPhoneVerificationCode,
+} from './lib/firebase';
 import AuthPage from './pages/AuthPage';
 import HomePage from './pages/HomePage';
 import BookingsPage from './pages/BookingsPage';
@@ -57,6 +63,8 @@ function App() {
     serviceTitle: '',
   });
   const [statusMessage, setStatusMessage] = useState('Use phone number and 4-digit PIN to continue.');
+  const recaptchaVerifierRef = useRef(null);
+  const phoneConfirmationRef = useRef(null);
 
   const filteredProviders = useMemo(() => {
     if (!search.trim()) {
@@ -159,13 +167,15 @@ function App() {
 
   const handleRequestOtp = async () => {
     try {
-      const response = await apiPost('/auth/request-otp', { phoneNumber: signupForm.phoneNumber });
-      setSignupForm((current) => ({
-        ...current,
-        otpToken: response.otpToken,
-      }));
+      if (recaptchaVerifierRef.current) {
+        recaptchaVerifierRef.current.clear();
+      }
+
+      const recaptchaVerifier = createPhoneRecaptchaVerifier('firebase-recaptcha');
+      recaptchaVerifierRef.current = recaptchaVerifier;
+      phoneConfirmationRef.current = await sendPhoneVerificationCode(signupForm.phoneNumber, recaptchaVerifier);
       setAuthStep('signup-otp');
-      setStatusMessage(`OTP sent. Demo code: ${response.otpCode}`);
+      setStatusMessage('Verification code sent to your phone.');
     } catch (error) {
       setStatusMessage(error.message);
     }
@@ -173,14 +183,20 @@ function App() {
 
   const handleVerifyOtp = async () => {
     try {
-      const response = await apiPost('/auth/verify-otp', {
+      if (!phoneConfirmationRef.current) {
+        setStatusMessage('Request a verification code first.');
+        return;
+      }
+
+      const idToken = await confirmPhoneVerificationCode(phoneConfirmationRef.current, signupForm.otpCode);
+      const response = await apiPost('/auth/verify-firebase-phone', {
+        idToken,
         phoneNumber: signupForm.phoneNumber,
-        otpToken: signupForm.otpToken,
-        otpCode: signupForm.otpCode,
       });
 
       setSignupForm((current) => ({
         ...current,
+        phoneNumber: response.phoneNumber,
         verificationToken: response.verificationToken,
       }));
       setAuthStep('signup-profile');
@@ -204,6 +220,8 @@ function App() {
       setSession(response);
       setStatusMessage(response.message);
       setAuthStep('portal');
+      phoneConfirmationRef.current = null;
+      await clearFirebaseWebSession();
     } catch (error) {
       setStatusMessage(error.message);
     }
@@ -350,7 +368,13 @@ function App() {
             onRequestOtp={handleRequestOtp}
             onVerifyOtp={handleVerifyOtp}
             onCompleteSignup={handleCompleteSignup}
-            onStepChange={setAuthStep}
+            onStepChange={(nextStep) => {
+              if (nextStep === 'login') {
+                phoneConfirmationRef.current = null;
+              }
+
+              setAuthStep(nextStep);
+            }}
           />
         </main>
       </div>

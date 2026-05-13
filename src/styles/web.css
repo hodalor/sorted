@@ -112,6 +112,7 @@ h3 {
 }
 
 .auth-copy,
+.auth-hint,
 .status-banner,
 .provider-review,
 .provider-panel p,
@@ -173,6 +174,10 @@ h3 {
 .provider-panel,
 .provider-onboarding {
   padding: 16px;
+}
+
+.firebase-recaptcha {
+  min-height: 78px;
 }
 
 .compact-card {

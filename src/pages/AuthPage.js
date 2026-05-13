@@ -49,6 +49,7 @@ function AuthPage({
 
       {authStep === 'signup-phone' ? (
         <div className="auth-card">
+          <p className="auth-hint">Firebase will text a verification code to this number.</p>
           <input
             name="phoneNumber"
             type="tel"
@@ -56,6 +57,7 @@ function AuthPage({
             value={signupForm.phoneNumber}
             onChange={onSignupChange}
           />
+          <div id="firebase-recaptcha" className="firebase-recaptcha" />
           <button className="primary-btn full" onClick={onRequestOtp}>
             Request OTP
           </button>
@@ -67,6 +69,7 @@ function AuthPage({
 
       {authStep === 'signup-otp' ? (
         <div className="auth-card">
+          <p className="auth-hint">Enter the SMS code sent by Firebase.</p>
           <input
             name="otpCode"
             type="text"

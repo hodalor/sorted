@@ -6,7 +6,7 @@ const appSettingSchema = new mongoose.Schema(
       type: String,
       required: true,
       unique: true,
-      enum: ['mobile', 'web'],
+      enum: ['general', 'mobile', 'web'],
     },
     values: {
       type: mongoose.Schema.Types.Mixed,

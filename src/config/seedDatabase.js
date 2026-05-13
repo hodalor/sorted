@@ -29,6 +29,7 @@ const seedDatabase = async () => {
   }
 
   await AppSetting.create([
+    { platform: 'general', values: appSettings.general },
     { platform: 'mobile', values: appSettings.mobile },
     { platform: 'web', values: appSettings.web },
   ]);

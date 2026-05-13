@@ -6,6 +6,7 @@ const morgan = require('morgan');
 const authRoutes = require('./routes/authRoutes');
 const bookingRoutes = require('./routes/bookingRoutes');
 const categoryRoutes = require('./routes/categoryRoutes');
+const countryRoutes = require('./routes/countryRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const healthRoutes = require('./routes/healthRoutes');
 const providerRoutes = require('./routes/providerRoutes');
@@ -35,6 +36,7 @@ app.get('/', (_req, res) => {
       auth: '/api/auth',
       services: '/api/services',
       categories: '/api/categories',
+      countries: '/api/countries',
       providers: '/api/providers',
       bookings: '/api/bookings',
       users: '/api/users',
@@ -49,6 +51,7 @@ app.use('/api/health', healthRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/services', serviceRoutes);
 app.use('/api/categories', categoryRoutes);
+app.use('/api/countries', countryRoutes);
 app.use('/api/providers', providerRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/users', userRoutes);

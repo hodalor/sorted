@@ -20,6 +20,13 @@ const appSettings = {
   },
 };
 
+const countries = [
+  { id: 'country-gh', name: 'Ghana', code: 'GH', dialingCode: '+233', currencySymbol: 'GHS', enabled: true },
+  { id: 'country-ng', name: 'Nigeria', code: 'NG', dialingCode: '+234', currencySymbol: 'NGN', enabled: true },
+  { id: 'country-ke', name: 'Kenya', code: 'KE', dialingCode: '+254', currencySymbol: 'KES', enabled: true },
+  { id: 'country-za', name: 'South Africa', code: 'ZA', dialingCode: '+27', currencySymbol: 'ZAR', enabled: true },
+];
+
 const appUsers = [
   {
     id: 'user-001',
@@ -224,6 +231,7 @@ const reviews = [
 
 module.exports = {
   categories,
+  countries,
   providers,
   services,
   bookings,

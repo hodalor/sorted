@@ -2,12 +2,13 @@ const bcrypt = require('bcryptjs');
 
 const AppSetting = require('../models/AppSetting');
 const Category = require('../models/Category');
+const Country = require('../models/Country');
 const Booking = require('../models/Booking');
 const Provider = require('../models/Provider');
 const Review = require('../models/Review');
 const Service = require('../models/Service');
 const User = require('../models/User');
-const { appSettings, appUsers, bookings, categories, providers, reviews, services } = require('../data/mockData');
+const { appSettings, appUsers, bookings, categories, countries, providers, reviews, services } = require('../data/mockData');
 
 const seedDatabase = async () => {
   const existingUsers = await User.countDocuments();
@@ -21,6 +22,10 @@ const seedDatabase = async () => {
       name: category.name,
       icon: category.icon,
     });
+  }
+
+  for (const country of countries) {
+    await Country.create(country);
   }
 
   await AppSetting.create([

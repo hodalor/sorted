@@ -11,6 +11,7 @@ const User = require('../models/User');
 const otpStore = new Map();
 
 const normalizePhoneNumber = (value = '') => value.replace(/[^\d+]/g, '');
+const generateOtpCode = () => String(Math.floor(1000 + Math.random() * 9000));
 
 const buildToken = (user) =>
   jwt.sign(
@@ -83,7 +84,7 @@ const requestOtp = async (req, res, next) => {
     }
 
     const { phoneNumber } = req.body;
-    const otpCode = '1234';
+    const otpCode = generateOtpCode();
     const otpToken = `otp-${Date.now()}`;
 
     otpStore.set(otpToken, {
@@ -96,6 +97,7 @@ const requestOtp = async (req, res, next) => {
       message: 'OTP sent successfully.',
       otpToken,
       otpCode,
+      provider: 'system',
     });
   } catch (error) {
     if (error instanceof Error && error.message.includes('Firebase Admin credentials are missing')) {
@@ -129,6 +131,8 @@ const verifyOtp = async (req, res, next) => {
     if (otpSession.otpCode !== otpCode) {
       return res.status(400).json({ message: 'OTP code is incorrect.' });
     }
+
+    otpStore.delete(otpToken);
 
     return res.json({
       message: 'Phone number verified successfully.',

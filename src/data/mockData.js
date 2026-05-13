@@ -12,11 +12,13 @@ const appSettings = {
     allowProviderOnboarding: true,
     showMessagesTab: true,
     compactCards: true,
+    otpProvider: 'firebase',
   },
   web: {
     compactMenu: true,
     stickyBottomMenu: true,
     showProviderPrompt: true,
+    otpProvider: 'firebase',
   },
 };
 

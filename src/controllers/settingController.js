@@ -2,6 +2,8 @@ const { isDbConnected } = require('../config/dbState');
 const { appSettings } = require('../data/mockData');
 const AppSetting = require('../models/AppSetting');
 
+const getDefaultPlatformSettings = (platform) => appSettings[platform] || {};
+
 const getPlatformSettings = async (req, res, next) => {
   try {
     const { platform } = req.params;
@@ -11,13 +13,18 @@ const getPlatformSettings = async (req, res, next) => {
 
       return res.json({
         platform,
-        values: setting?.values || {},
+        values: {
+          ...getDefaultPlatformSettings(platform),
+          ...(setting?.values || {}),
+        },
       });
     }
 
     return res.json({
       platform,
-      values: appSettings[platform] || {},
+      values: {
+        ...getDefaultPlatformSettings(platform),
+      },
     });
   } catch (error) {
     return next(error);
@@ -30,9 +37,16 @@ const updatePlatformSettings = async (req, res, next) => {
     const values = req.body || {};
 
     if (isDbConnected()) {
+      const existingSetting = await AppSetting.findOne({ platform }).lean();
       const setting = await AppSetting.findOneAndUpdate(
         { platform },
-        { values },
+        {
+          values: {
+            ...getDefaultPlatformSettings(platform),
+            ...(existingSetting?.values || {}),
+            ...values,
+          },
+        },
         { new: true, upsert: true, setDefaultsOnInsert: true }
       ).lean();
 
@@ -43,7 +57,7 @@ const updatePlatformSettings = async (req, res, next) => {
     }
 
     appSettings[platform] = {
-      ...(appSettings[platform] || {}),
+      ...getDefaultPlatformSettings(platform),
       ...values,
     };
 

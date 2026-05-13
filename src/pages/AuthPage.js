@@ -1,7 +1,9 @@
 function AuthPage({
   authStep,
+  countryCodeOptions,
   loginForm,
   signupForm,
+  authLoading,
   statusMessage,
   onLoginChange,
   onSignupChange,
@@ -22,13 +24,22 @@ function AuthPage({
 
       {authStep === 'login' ? (
         <div className="auth-card">
-          <input
-            name="phoneNumber"
-            type="tel"
-            placeholder="Phone number"
-            value={loginForm.phoneNumber}
-            onChange={onLoginChange}
-          />
+          <div className="phone-input-row">
+            <select name="countryCode" value={loginForm.countryCode} onChange={onLoginChange}>
+              {countryCodeOptions.map((code) => (
+                <option key={code} value={code}>
+                  {code}
+                </option>
+              ))}
+            </select>
+            <input
+              name="phoneNumber"
+              type="tel"
+              placeholder="Phone number"
+              value={loginForm.phoneNumber}
+              onChange={onLoginChange}
+            />
+          </div>
           <input
             name="pin"
             type="password"
@@ -38,8 +49,8 @@ function AuthPage({
             value={loginForm.pin}
             onChange={onLoginChange}
           />
-          <button className="primary-btn full" onClick={onLogin}>
-            Login
+          <button className="primary-btn full" onClick={onLogin} disabled={authLoading.login}>
+            {authLoading.login ? 'Logging in...' : 'Login'}
           </button>
           <button className="text-btn" onClick={() => onStepChange('signup-phone')}>
             Sign up
@@ -50,16 +61,25 @@ function AuthPage({
       {authStep === 'signup-phone' ? (
         <div className="auth-card">
           <p className="auth-hint">Firebase will text a verification code to this number.</p>
-          <input
-            name="phoneNumber"
-            type="tel"
-            placeholder="Phone number"
-            value={signupForm.phoneNumber}
-            onChange={onSignupChange}
-          />
+          <div className="phone-input-row">
+            <select name="countryCode" value={signupForm.countryCode} onChange={onSignupChange}>
+              {countryCodeOptions.map((code) => (
+                <option key={code} value={code}>
+                  {code}
+                </option>
+              ))}
+            </select>
+            <input
+              name="phoneNumber"
+              type="tel"
+              placeholder="Phone number"
+              value={signupForm.phoneNumber}
+              onChange={onSignupChange}
+            />
+          </div>
           <div id="firebase-recaptcha" className="firebase-recaptcha" />
-          <button className="primary-btn full" onClick={onRequestOtp}>
-            Request OTP
+          <button className="primary-btn full" onClick={onRequestOtp} disabled={authLoading.requestOtp}>
+            {authLoading.requestOtp ? 'Requesting OTP...' : 'Request OTP'}
           </button>
           <button className="text-btn" onClick={() => onStepChange('login')}>
             Back to login
@@ -79,8 +99,8 @@ function AuthPage({
             value={signupForm.otpCode}
             onChange={onSignupChange}
           />
-          <button className="primary-btn full" onClick={onVerifyOtp}>
-            Verify phone
+          <button className="primary-btn full" onClick={onVerifyOtp} disabled={authLoading.verifyOtp}>
+            {authLoading.verifyOtp ? 'Verifying...' : 'Verify phone'}
           </button>
         </div>
       ) : null}
@@ -111,8 +131,8 @@ function AuthPage({
             value={signupForm.email}
             onChange={onSignupChange}
           />
-          <button className="primary-btn full" onClick={onCompleteSignup}>
-            Finish signup
+          <button className="primary-btn full" onClick={onCompleteSignup} disabled={authLoading.completeSignup}>
+            {authLoading.completeSignup ? 'Finishing signup...' : 'Finish signup'}
           </button>
         </div>
       ) : null}

@@ -17,6 +17,7 @@ import ProfilePage from './pages/ProfilePage';
 import './styles/web.css';
 
 const signupDefaults = {
+  countryCode: '+233',
   phoneNumber: '',
   otpToken: '',
   otpCode: '',
@@ -47,10 +48,17 @@ function App() {
   const [authStep, setAuthStep] = useState('login');
   const [activeMenu, setActiveMenu] = useState('home');
   const [loginForm, setLoginForm] = useState({
-    phoneNumber: '+233240000001',
+    countryCode: '+233',
+    phoneNumber: '240000001',
     pin: '1234',
   });
   const [signupForm, setSignupForm] = useState(signupDefaults);
+  const [authLoading, setAuthLoading] = useState({
+    login: false,
+    requestOtp: false,
+    verifyOtp: false,
+    completeSignup: false,
+  });
   const [session, setSession] = useState(null);
   const [search, setSearch] = useState('');
   const [categories, setCategories] = useState([]);
@@ -67,6 +75,22 @@ function App() {
   const [statusMessage, setStatusMessage] = useState('Use phone number and 4-digit PIN to continue.');
   const recaptchaVerifierRef = useRef(null);
   const phoneConfirmationRef = useRef(null);
+  const countryCodeOptions = ['+233', '+234', '+254', '+27', '+1', '+44'];
+
+  const formatPhoneNumber = (countryCode, value) => {
+    const trimmedValue = value.trim();
+
+    if (!trimmedValue) {
+      return '';
+    }
+
+    if (trimmedValue.startsWith('+')) {
+      return trimmedValue;
+    }
+
+    const normalizedDigits = trimmedValue.replace(/\D/g, '').replace(/^0+/, '');
+    return `${countryCode}${normalizedDigits}`;
+  };
 
   const filteredProviders = useMemo(() => {
     if (!search.trim()) {
@@ -182,40 +206,52 @@ function App() {
 
   const handleLogin = async () => {
     try {
-      const response = await apiPost('/auth/login', loginForm);
+      setAuthLoading((current) => ({ ...current, login: true }));
+      const response = await apiPost('/auth/login', {
+        phoneNumber: formatPhoneNumber(loginForm.countryCode, loginForm.phoneNumber),
+        pin: loginForm.pin,
+      });
       setSession(response);
       setStatusMessage(response.message);
       setAuthStep('portal');
     } catch (error) {
       setStatusMessage(error.message);
+    } finally {
+      setAuthLoading((current) => ({ ...current, login: false }));
     }
   };
 
   const handleRequestOtp = async () => {
     try {
+      setAuthLoading((current) => ({ ...current, requestOtp: true }));
+      const fullPhoneNumber = formatPhoneNumber(signupForm.countryCode, signupForm.phoneNumber);
       const recaptchaVerifier =
         recaptchaVerifierRef.current || (await renderPhoneRecaptcha('firebase-recaptcha'));
 
       recaptchaVerifierRef.current = recaptchaVerifier;
-      phoneConfirmationRef.current = await sendPhoneVerificationCode(signupForm.phoneNumber, recaptchaVerifier);
+      phoneConfirmationRef.current = await sendPhoneVerificationCode(fullPhoneNumber, recaptchaVerifier);
       setAuthStep('signup-otp');
       setStatusMessage('Verification code sent to your phone.');
     } catch (error) {
       setStatusMessage(getFirebasePhoneErrorMessage(error));
+    } finally {
+      setAuthLoading((current) => ({ ...current, requestOtp: false }));
     }
   };
 
   const handleVerifyOtp = async () => {
     try {
+      setAuthLoading((current) => ({ ...current, verifyOtp: true }));
       if (!phoneConfirmationRef.current) {
         setStatusMessage('Request a verification code first.');
         return;
       }
 
+      const fullPhoneNumber = formatPhoneNumber(signupForm.countryCode, signupForm.phoneNumber);
       const idToken = await confirmPhoneVerificationCode(phoneConfirmationRef.current, signupForm.otpCode);
       const response = await apiPost('/auth/verify-firebase-phone', {
         idToken,
-        phoneNumber: signupForm.phoneNumber,
+        phoneNumber: fullPhoneNumber,
       });
 
       setSignupForm((current) => ({
@@ -227,11 +263,14 @@ function App() {
       setStatusMessage(response.message);
     } catch (error) {
       setStatusMessage(getFirebasePhoneErrorMessage(error));
+    } finally {
+      setAuthLoading((current) => ({ ...current, verifyOtp: false }));
     }
   };
 
   const handleCompleteSignup = async () => {
     try {
+      setAuthLoading((current) => ({ ...current, completeSignup: true }));
       const response = await apiPost('/auth/complete-signup', {
         verificationToken: signupForm.verificationToken,
         phoneNumber: signupForm.phoneNumber,
@@ -250,6 +289,8 @@ function App() {
       await clearFirebaseWebSession();
     } catch (error) {
       setStatusMessage(error.message);
+    } finally {
+      setAuthLoading((current) => ({ ...current, completeSignup: false }));
     }
   };
 
@@ -385,8 +426,10 @@ function App() {
         <main className="mobile-frame auth-frame">
           <AuthPage
             authStep={authStep}
+            countryCodeOptions={countryCodeOptions}
             loginForm={loginForm}
             signupForm={signupForm}
+            authLoading={authLoading}
             statusMessage={statusMessage}
             onLoginChange={handleLoginChange}
             onSignupChange={handleSignupChange}

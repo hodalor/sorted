@@ -39,7 +39,7 @@ export default function BookingsScreen() {
     };
 
     loadBookings();
-  }, [session]);
+  }, [router, session]);
 
   if (!session?.user) {
     return null;

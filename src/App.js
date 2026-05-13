@@ -21,8 +21,15 @@ function App() {
   const [bookings, setBookings] = useState([]);
   const [reviews, setReviews] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [countries, setCountries] = useState([]);
   const [platformSettings, setPlatformSettings] = useState({ mobile: {}, web: {} });
   const [categoryForm, setCategoryForm] = useState({ name: '', icon: '' });
+  const [countryForm, setCountryForm] = useState({
+    name: '',
+    code: '',
+    dialingCode: '',
+    currencySymbol: '',
+  });
   const [statusMessage, setStatusMessage] = useState('Loading admin data...');
 
   const titles = useMemo(
@@ -40,13 +47,14 @@ function App() {
 
   const loadCore = async () => {
     try {
-      const [dashboardData, userData, bookingData, reviewData, categoryData, mobileData, webData] =
+      const [dashboardData, userData, bookingData, reviewData, categoryData, countryData, mobileData, webData] =
         await Promise.all([
           apiGet('/dashboard/overview'),
           apiGet('/users'),
           apiGet('/bookings'),
           apiGet('/reviews'),
           apiGet('/categories'),
+          apiGet('/countries'),
           apiGet('/settings/mobile'),
           apiGet('/settings/web'),
         ]);
@@ -56,6 +64,7 @@ function App() {
       setBookings(bookingData.items);
       setReviews(reviewData.items);
       setCategories(categoryData.items);
+      setCountries(countryData.items);
       setPlatformSettings({ mobile: mobileData.values, web: webData.values });
       setStatusMessage('Admin synced successfully.');
     } catch (error) {
@@ -108,6 +117,29 @@ function App() {
       const categoryData = await apiGet('/categories');
       setCategories(categoryData.items);
       setStatusMessage('Category removed successfully.');
+    } catch (error) {
+      setStatusMessage(error.message);
+    }
+  };
+
+  const handleCountryCreate = async () => {
+    try {
+      await apiPost('/countries', countryForm);
+      setCountryForm({ name: '', code: '', dialingCode: '', currencySymbol: '' });
+      const countryData = await apiGet('/countries');
+      setCountries(countryData.items);
+      setStatusMessage('Country created successfully.');
+    } catch (error) {
+      setStatusMessage(error.message);
+    }
+  };
+
+  const handleCountryDelete = async (countryId) => {
+    try {
+      await apiDelete(`/countries/${countryId}`);
+      const countryData = await apiGet('/countries');
+      setCountries(countryData.items);
+      setStatusMessage('Country removed successfully.');
     } catch (error) {
       setStatusMessage(error.message);
     }
@@ -166,6 +198,16 @@ function App() {
             }
             onCategoryCreate={handleCategoryCreate}
             onCategoryDelete={handleCategoryDelete}
+            countries={countries}
+            countryForm={countryForm}
+            onCountryChange={(event) =>
+              setCountryForm((current) => ({
+                ...current,
+                [event.target.name]: event.target.value,
+              }))
+            }
+            onCountryCreate={handleCountryCreate}
+            onCountryDelete={handleCountryDelete}
             platformSettings={platformSettings}
             onPlatformChange={handlePlatformChange}
             onPlatformSave={handlePlatformSave}

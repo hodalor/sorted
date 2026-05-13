@@ -9,4 +9,4 @@ export const menuItems = [
 ];
 
 export const providerTabs = ['pending', 'approved', 'rejected'];
-export const settingsTabs = ['category', 'mobile', 'web'];
+export const settingsTabs = ['category', 'country', 'mobile', 'web'];

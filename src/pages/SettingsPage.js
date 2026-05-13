@@ -8,6 +8,11 @@ function SettingsPage({
   onCategoryChange,
   onCategoryCreate,
   onCategoryDelete,
+  countries,
+  countryForm,
+  onCountryChange,
+  onCountryCreate,
+  onCountryDelete,
   platformSettings,
   onPlatformChange,
   onPlatformSave,
@@ -68,7 +73,57 @@ function SettingsPage({
         </div>
       ) : null}
 
-      {activeTab !== 'category' ? (
+      {activeTab === 'country' ? (
+        <div className="settings-grid">
+          <div className="settings-form">
+            <input
+              name="name"
+              value={countryForm.name}
+              onChange={onCountryChange}
+              placeholder="Country name"
+            />
+            <input
+              name="code"
+              value={countryForm.code}
+              onChange={onCountryChange}
+              placeholder="Country code e.g. GH"
+            />
+            <input
+              name="dialingCode"
+              value={countryForm.dialingCode}
+              onChange={onCountryChange}
+              placeholder="Dialing code e.g. +233"
+            />
+            <input
+              name="currencySymbol"
+              value={countryForm.currencySymbol}
+              onChange={onCountryChange}
+              placeholder="Currency symbol e.g. GHS"
+            />
+            <button className="primary-btn" onClick={onCountryCreate}>
+              Create Country
+            </button>
+          </div>
+
+          <div className="panel-list">
+            {countries.map((country) => (
+              <div className="list-row" key={country._id || country.id}>
+                <div>
+                  <strong>{country.name}</strong>
+                  <p>
+                    {country.dialingCode} · {country.currencySymbol} · {country.code}
+                  </p>
+                </div>
+                <button className="ghost-btn small" onClick={() => onCountryDelete(country._id || country.id)}>
+                  Remove
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {activeTab !== 'category' && activeTab !== 'country' ? (
         <div className="settings-form">
           {Object.entries(platformSettings[activeTab] || {}).map(([key, value]) => (
             <label className="setting-line" key={key}>

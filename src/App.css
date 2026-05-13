@@ -5,15 +5,15 @@
   justify-content: center;
   padding: 24px 16px;
   background:
-    radial-gradient(circle at top, rgba(245, 158, 11, 0.18), transparent 28%),
+    radial-gradient(circle at top, rgba(59, 130, 246, 0.18), transparent 28%),
     linear-gradient(180deg, #05060b 0%, #10151f 100%);
   color: #f8fafc;
 }
 
 .mobile-frame {
-  width: min(100%, 430px);
+  width: min(100%, 440px);
   min-height: 100vh;
-  background: rgba(17, 17, 17, 0.92);
+  background: rgba(17, 17, 17, 0.94);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 32px;
   padding: 24px 18px 110px;
@@ -21,15 +21,43 @@
   position: relative;
 }
 
+.auth-frame {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.auth-screen,
 .hero-card,
 .auth-card,
 .category-card,
 .provider-card,
+.provider-panel,
+.provider-booking-card,
 .bottom-nav,
-.booking-list li {
+.booking-list li,
+.provider-onboarding {
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(26, 26, 26, 0.96);
   border-radius: 22px;
+}
+
+.auth-screen {
+  width: 100%;
+  padding: 26px 20px;
+  display: grid;
+  gap: 16px;
+}
+
+.auth-copy,
+.status-banner,
+.provider-review,
+.provider-panel p,
+.account-row span,
+.booking-list,
+.provider-booking-card p,
+.category-card span {
+  color: #cbd5e1;
 }
 
 .hero-card {
@@ -39,7 +67,9 @@
 .hero-top,
 .provider-head,
 .provider-footer,
-.section-heading {
+.section-heading,
+.provider-panel-header,
+.account-row {
   display: flex;
   justify-content: space-between;
   gap: 12px;
@@ -55,6 +85,7 @@
 
 h1,
 h2,
+h3,
 p {
   margin: 0;
 }
@@ -65,6 +96,10 @@ h1 {
 
 h2 {
   font-size: 1.15rem;
+}
+
+h3 {
+  font-size: 1.1rem;
 }
 
 .avatar {
@@ -79,7 +114,8 @@ h2 {
 }
 
 .search-bar,
-.auth-card {
+.auth-card,
+.provider-onboarding {
   display: grid;
   gap: 12px;
 }
@@ -94,13 +130,23 @@ h2 {
 }
 
 .search-bar input,
-.auth-card input {
+.auth-card input,
+.provider-onboarding input,
+.provider-onboarding select,
+.provider-onboarding textarea {
   width: 100%;
   border: none;
   outline: none;
-  background: transparent;
   color: #f9fafb;
   font-size: 1rem;
+  border-radius: 16px;
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.provider-onboarding textarea {
+  min-height: 110px;
+  resize: vertical;
 }
 
 .section-block {
@@ -109,25 +155,24 @@ h2 {
   gap: 16px;
 }
 
-.auth-card {
+.auth-card,
+.provider-panel,
+.provider-onboarding {
   padding: 18px;
 }
 
-.auth-card input {
-  border-radius: 16px;
-  padding: 14px 16px;
-  background: rgba(255, 255, 255, 0.04);
+.account-row {
+  align-items: center;
 }
 
-.auth-actions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+.account-row strong {
+  color: #f8fafc;
 }
 
 .primary-btn,
 .ghost-btn,
-.nav-link {
+.nav-link,
+.text-btn {
   border-radius: 16px;
   padding: 14px 16px;
   font-weight: 700;
@@ -140,6 +185,10 @@ h2 {
   color: #111827;
 }
 
+.primary-btn.full {
+  width: 100%;
+}
+
 .ghost-btn,
 .nav-link {
   background: rgba(255, 255, 255, 0.04);
@@ -147,9 +196,22 @@ h2 {
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
+.text-btn {
+  background: transparent;
+  color: #93c5fd;
+}
+
 .ghost-btn.small {
   padding: 10px 14px;
   border-radius: 999px;
+}
+
+.pill {
+  border-radius: 999px;
+  padding: 8px 12px;
+  background: rgba(59, 130, 246, 0.16);
+  color: #bfdbfe;
+  font-size: 0.82rem;
 }
 
 .category-grid {
@@ -162,12 +224,6 @@ h2 {
   padding: 18px;
   display: grid;
   gap: 8px;
-}
-
-.category-card span,
-.provider-card p,
-.booking-list {
-  color: #d1d5db;
 }
 
 .category-icon {
@@ -205,7 +261,8 @@ h2 {
 }
 
 .provider-list,
-.booking-list {
+.booking-list,
+.provider-booking-stack {
   display: grid;
   gap: 14px;
 }
@@ -216,11 +273,6 @@ h2 {
 
 .provider-head {
   align-items: center;
-}
-
-.provider-head p,
-.provider-review {
-  margin-top: 4px;
 }
 
 .provider-rating {
@@ -239,6 +291,30 @@ h2 {
   margin-top: 16px;
 }
 
+.provider-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.provider-onboarding.compact {
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+
+.provider-booking-card {
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+}
+
+.provider-booking-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
 .booking-list {
   list-style: none;
   padding: 0;
@@ -251,11 +327,10 @@ h2 {
 }
 
 .status-banner {
-  margin: 20px 0 0;
-  color: #cbd5e1;
+  margin: 0;
   text-align: center;
   font-size: 0.92rem;
-  line-height: 1.5;
+  line-height: 1.6;
 }
 
 .bottom-nav {

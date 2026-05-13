@@ -39,7 +39,7 @@ export default function AuthScreen() {
   useEffect(() => {
     const loadSettings = async () => {
       try {
-        const response = await apiGet('/settings/mobile');
+        const response = await apiGet('/settings/general');
         const provider = response?.values?.otpProvider;
 
         if (provider === 'firebase' || provider === 'system') {

@@ -4,7 +4,9 @@ import BottomNav from './components/BottomNav';
 import {
   clearFirebaseWebSession,
   confirmPhoneVerificationCode,
-  createPhoneRecaptchaVerifier,
+  getFirebasePhoneErrorMessage,
+  renderPhoneRecaptcha,
+  resetPhoneRecaptcha,
   sendPhoneVerificationCode,
 } from './lib/firebase';
 import AuthPage from './pages/AuthPage';
@@ -122,6 +124,30 @@ function App() {
     }
   }, [session]);
 
+  useEffect(() => {
+    if (authStep !== 'signup-phone') {
+      return undefined;
+    }
+
+    let isMounted = true;
+
+    const preloadRecaptcha = async () => {
+      try {
+        await renderPhoneRecaptcha('firebase-recaptcha');
+      } catch (error) {
+        if (isMounted) {
+          setStatusMessage(getFirebasePhoneErrorMessage(error));
+        }
+      }
+    };
+
+    preloadRecaptcha();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [authStep]);
+
   const handleLoginChange = (event) => {
     const { name, value } = event.target;
     setLoginForm((current) => ({
@@ -167,17 +193,15 @@ function App() {
 
   const handleRequestOtp = async () => {
     try {
-      if (recaptchaVerifierRef.current) {
-        recaptchaVerifierRef.current.clear();
-      }
+      const recaptchaVerifier =
+        recaptchaVerifierRef.current || (await renderPhoneRecaptcha('firebase-recaptcha'));
 
-      const recaptchaVerifier = createPhoneRecaptchaVerifier('firebase-recaptcha');
       recaptchaVerifierRef.current = recaptchaVerifier;
       phoneConfirmationRef.current = await sendPhoneVerificationCode(signupForm.phoneNumber, recaptchaVerifier);
       setAuthStep('signup-otp');
       setStatusMessage('Verification code sent to your phone.');
     } catch (error) {
-      setStatusMessage(error.message);
+      setStatusMessage(getFirebasePhoneErrorMessage(error));
     }
   };
 
@@ -202,7 +226,7 @@ function App() {
       setAuthStep('signup-profile');
       setStatusMessage(response.message);
     } catch (error) {
-      setStatusMessage(error.message);
+      setStatusMessage(getFirebasePhoneErrorMessage(error));
     }
   };
 
@@ -221,6 +245,8 @@ function App() {
       setStatusMessage(response.message);
       setAuthStep('portal');
       phoneConfirmationRef.current = null;
+      recaptchaVerifierRef.current = null;
+      resetPhoneRecaptcha();
       await clearFirebaseWebSession();
     } catch (error) {
       setStatusMessage(error.message);
@@ -371,6 +397,8 @@ function App() {
             onStepChange={(nextStep) => {
               if (nextStep === 'login') {
                 phoneConfirmationRef.current = null;
+                recaptchaVerifierRef.current = null;
+                resetPhoneRecaptcha();
               }
 
               setAuthStep(nextStep);

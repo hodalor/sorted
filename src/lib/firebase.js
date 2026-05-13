@@ -26,12 +26,30 @@ const getFirebaseApp = () => {
   return getApps().length ? getApp() : initializeApp(firebaseConfig);
 };
 
+let recaptchaVerifierInstance = null;
+let recaptchaContainerId = '';
+
 const getFirebaseAuthClient = () => getAuth(getFirebaseApp());
 
-export const createPhoneRecaptchaVerifier = (containerId) =>
-  new RecaptchaVerifier(getFirebaseAuthClient(), containerId, {
+export const createPhoneRecaptchaVerifier = (containerId) => {
+  if (recaptchaVerifierInstance && recaptchaContainerId === containerId) {
+    return recaptchaVerifierInstance;
+  }
+
+  const auth = getFirebaseAuthClient();
+  recaptchaContainerId = containerId;
+  recaptchaVerifierInstance = new RecaptchaVerifier(auth, containerId, {
     size: 'normal',
   });
+
+  return recaptchaVerifierInstance;
+};
+
+export const renderPhoneRecaptcha = async (containerId) => {
+  const verifier = createPhoneRecaptchaVerifier(containerId);
+  await verifier.render();
+  return verifier;
+};
 
 export const sendPhoneVerificationCode = async (phoneNumber, appVerifier) =>
   signInWithPhoneNumber(getFirebaseAuthClient(), phoneNumber, appVerifier);
@@ -47,6 +65,32 @@ export const clearFirebaseWebSession = async () => {
   }
 
   await getFirebaseAuthClient().signOut();
+};
+
+export const resetPhoneRecaptcha = () => {
+  if (recaptchaVerifierInstance) {
+    recaptchaVerifierInstance.clear();
+    recaptchaVerifierInstance = null;
+    recaptchaContainerId = '';
+  }
+};
+
+export const getFirebasePhoneErrorMessage = (error) => {
+  const message = error instanceof Error ? error.message : 'Could not start phone verification.';
+
+  if (
+    message.includes('network-request-failed') ||
+    message.includes('ERR_TIMED_OUT') ||
+    message.includes('Failed to load resource')
+  ) {
+    return 'reCAPTCHA could not load on this network. Disable ad blockers or privacy shields, then try again.';
+  }
+
+  if (message.includes('invalid-app-credential') || message.includes('invalid application verifier')) {
+    return 'reCAPTCHA verification failed. Refresh the page and try requesting the code again.';
+  }
+
+  return message;
 };
 
 export const isFirebaseWebReady = () => hasFirebaseWebConfig;

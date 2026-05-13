@@ -3,28 +3,75 @@ const jwt = require('jsonwebtoken');
 const { validationResult } = require('express-validator');
 
 const { isDbConnected } = require('../config/dbState');
-const { appUsers } = require('../data/mockData');
+const { appUsers, providers } = require('../data/mockData');
+const Provider = require('../models/Provider');
 const User = require('../models/User');
+
+const otpStore = new Map();
 
 const buildToken = (user) =>
   jwt.sign(
     {
-      sub: user.id,
-      email: user.email,
+      sub: user.id || user._id,
+      phoneNumber: user.phoneNumber,
       role: user.role,
     },
     process.env.JWT_SECRET || 'sorted-dev-secret',
     { expiresIn: '7d' }
   );
 
-const sanitizeUser = (user) => ({
-  id: user.id || user._id,
-  name: user.name,
-  email: user.email,
-  role: user.role,
-});
+const buildVerificationToken = (phoneNumber) =>
+  jwt.sign(
+    {
+      phoneNumber,
+      verifiedForSignup: true,
+    },
+    process.env.JWT_SECRET || 'sorted-dev-secret',
+    { expiresIn: '10m' }
+  );
 
-const register = async (req, res, next) => {
+const getProviderForUser = async (user) => {
+  if (!user) {
+    return null;
+  }
+
+  if (isDbConnected()) {
+    return Provider.findOne({ user: user._id }).lean();
+  }
+
+  return providers.find((provider) => provider.userId === user.id);
+};
+
+const sanitizeUser = async (user) => {
+  const provider = await getProviderForUser(user);
+
+  return {
+    id: user.id || user._id,
+    name: user.name,
+    phoneNumber: user.phoneNumber,
+    email: user.email || '',
+    address: user.address || '',
+    role: user.role,
+    isPhoneVerified: Boolean(user.isPhoneVerified),
+    profileCompleted: Boolean(user.profileCompleted),
+    providerProfile: provider
+      ? {
+          id: provider.id || provider._id,
+          businessName: provider.businessName,
+          status: provider.status,
+          category: provider.category,
+          serviceTitle: provider.serviceTitle,
+        }
+      : null,
+    permissions: {
+      canBook: Boolean(user.isPhoneVerified && user.profileCompleted),
+      canProvide: Boolean(provider && provider.status === 'approved'),
+      hasProviderProfile: Boolean(provider),
+    },
+  };
+};
+
+const requestOtp = async (req, res, next) => {
   try {
     const errors = validationResult(req);
 
@@ -32,42 +79,132 @@ const register = async (req, res, next) => {
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { name, email, password, role = 'seeker' } = req.body;
-    const normalizedEmail = email.toLowerCase();
-    const existingUser = isDbConnected()
-      ? await User.findOne({ email: normalizedEmail }).lean()
-      : appUsers.find((user) => user.email === normalizedEmail);
+    const { phoneNumber } = req.body;
+    const otpCode = '1234';
+    const otpToken = `otp-${Date.now()}`;
 
-    if (existingUser) {
-      return res.status(409).json({ message: 'Email is already registered.' });
+    otpStore.set(otpToken, {
+      phoneNumber,
+      otpCode,
+      expiresAt: Date.now() + 10 * 60 * 1000,
+    });
+
+    return res.json({
+      message: 'OTP sent successfully.',
+      otpToken,
+      otpCode,
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+const verifyOtp = async (req, res, next) => {
+  try {
+    const errors = validationResult(req);
+
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
     }
 
-    const passwordHash = await bcrypt.hash(password, 10);
+    const { phoneNumber, otpToken, otpCode } = req.body;
+    const otpSession = otpStore.get(otpToken);
+
+    if (!otpSession || otpSession.phoneNumber !== phoneNumber) {
+      return res.status(400).json({ message: 'OTP session is invalid.' });
+    }
+
+    if (otpSession.expiresAt < Date.now()) {
+      otpStore.delete(otpToken);
+      return res.status(400).json({ message: 'OTP has expired.' });
+    }
+
+    if (otpSession.otpCode !== otpCode) {
+      return res.status(400).json({ message: 'OTP code is incorrect.' });
+    }
+
+    return res.json({
+      message: 'Phone number verified successfully.',
+      verificationToken: buildVerificationToken(phoneNumber),
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+const completeSignup = async (req, res, next) => {
+  try {
+    const errors = validationResult(req);
+
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { verificationToken, phoneNumber, pin, name, address, email = '' } = req.body;
+    const decoded = jwt.verify(verificationToken, process.env.JWT_SECRET || 'sorted-dev-secret');
+
+    if (!decoded.verifiedForSignup || decoded.phoneNumber !== phoneNumber) {
+      return res.status(400).json({ message: 'Verification token is invalid.' });
+    }
+
+    const existingUser = isDbConnected()
+      ? await User.findOne({ phoneNumber })
+      : appUsers.find((item) => item.phoneNumber === phoneNumber);
+
+    if (existingUser && existingUser.profileCompleted) {
+      return res.status(409).json({ message: 'This phone number already has an account.' });
+    }
+
+    const pinHash = await bcrypt.hash(pin, 10);
     let user;
 
     if (isDbConnected()) {
-      user = await User.create({
-        name,
-        email: normalizedEmail,
-        passwordHash,
-        role,
-      });
-    } else {
-      user = {
-        id: `user-${Date.now()}`,
-        name,
-        email: normalizedEmail,
-        passwordHash,
-        role,
-      };
+      user =
+        existingUser ||
+        (await User.create({
+          phoneNumber,
+          role: 'seeker',
+        }));
 
-      appUsers.push(user);
+      user.name = name;
+      user.address = address;
+      user.email = email ? email.toLowerCase() : '';
+      user.pinHash = pinHash;
+      user.isPhoneVerified = true;
+      user.profileCompleted = true;
+      user.role = 'seeker';
+      await user.save();
+    } else {
+      if (existingUser) {
+        existingUser.name = name;
+        existingUser.address = address;
+        existingUser.email = email ? email.toLowerCase() : '';
+        existingUser.pinHash = pinHash;
+        existingUser.isPhoneVerified = true;
+        existingUser.profileCompleted = true;
+        existingUser.role = 'seeker';
+        delete existingUser.seedPin;
+        user = existingUser;
+      } else {
+        user = {
+          id: `user-${Date.now()}`,
+          name,
+          phoneNumber,
+          email: email ? email.toLowerCase() : '',
+          address,
+          pinHash,
+          role: 'seeker',
+          isPhoneVerified: true,
+          profileCompleted: true,
+        };
+        appUsers.push(user);
+      }
     }
 
     return res.status(201).json({
-      message: 'Registration successful.',
+      message: 'Account created successfully.',
       token: buildToken(user),
-      user: sanitizeUser(user),
+      user: await sanitizeUser(user),
     });
   } catch (error) {
     return next(error);
@@ -82,28 +219,25 @@ const login = async (req, res, next) => {
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { email, password } = req.body;
-    const normalizedEmail = email.toLowerCase();
+    const { phoneNumber, pin } = req.body;
     const user = isDbConnected()
-      ? await User.findOne({ email: normalizedEmail })
-      : appUsers.find((item) => item.email === normalizedEmail);
+      ? await User.findOne({ phoneNumber })
+      : appUsers.find((item) => item.phoneNumber === phoneNumber);
 
-    if (!user) {
-      return res.status(401).json({ message: 'Invalid email or password.' });
+    if (!user || !user.pinHash && !user.seedPin) {
+      return res.status(401).json({ message: 'Invalid phone number or PIN.' });
     }
 
-    const passwordMatches =
-      (user.passwordHash && (await bcrypt.compare(password, user.passwordHash))) ||
-      user.seedPassword === password;
+    const pinMatches = (user.pinHash && (await bcrypt.compare(pin, user.pinHash))) || user.seedPin === pin;
 
-    if (!passwordMatches) {
-      return res.status(401).json({ message: 'Invalid email or password.' });
+    if (!pinMatches) {
+      return res.status(401).json({ message: 'Invalid phone number or PIN.' });
     }
 
     return res.json({
       message: 'Login successful.',
       token: buildToken(user),
-      user: sanitizeUser(user),
+      user: await sanitizeUser(user),
     });
   } catch (error) {
     return next(error);
@@ -111,6 +245,8 @@ const login = async (req, res, next) => {
 };
 
 module.exports = {
-  register,
+  requestOtp,
+  verifyOtp,
+  completeSignup,
   login,
 };

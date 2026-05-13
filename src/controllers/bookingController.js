@@ -8,10 +8,14 @@ const Service = require('../models/Service');
 
 const getBookings = async (req, res, next) => {
   try {
-    const { seekerEmail, providerId, status } = req.query;
+    const { seekerPhone, seekerEmail, providerId, status } = req.query;
 
     if (isDbConnected()) {
       const query = {};
+
+      if (seekerPhone) {
+        query.seekerPhone = seekerPhone;
+      }
 
       if (seekerEmail) {
         query.seekerEmail = seekerEmail.toLowerCase();
@@ -34,10 +38,11 @@ const getBookings = async (req, res, next) => {
     }
 
     const items = bookings.filter((booking) => {
+      const phoneMatch = seekerPhone ? booking.seekerPhone === seekerPhone : true;
       const emailMatch = seekerEmail ? booking.seekerEmail === seekerEmail.toLowerCase() : true;
       const providerMatch = providerId ? booking.providerId === providerId : true;
       const statusMatch = status ? booking.status === status : true;
-      return emailMatch && providerMatch && statusMatch;
+      return phoneMatch && emailMatch && providerMatch && statusMatch;
     });
 
     return res.json({
@@ -59,7 +64,8 @@ const createBooking = async (req, res, next) => {
 
     const payload = {
       ...req.body,
-      seekerEmail: req.body.seekerEmail.toLowerCase(),
+      seekerPhone: req.body.seekerPhone,
+      seekerEmail: req.body.seekerEmail ? req.body.seekerEmail.toLowerCase() : '',
       status: 'pending',
     };
 
@@ -77,6 +83,7 @@ const createBooking = async (req, res, next) => {
         serviceTitle: service.title,
         providerName: provider.name,
         seekerName: payload.seekerName,
+        seekerPhone: payload.seekerPhone,
         seekerEmail: payload.seekerEmail,
         date: payload.date,
         time: payload.time,
@@ -104,6 +111,7 @@ const createBooking = async (req, res, next) => {
       serviceTitle: service.title,
       providerName: provider.name,
       seekerName: payload.seekerName,
+      seekerPhone: payload.seekerPhone,
       seekerEmail: payload.seekerEmail,
       date: payload.date,
       time: payload.time,
@@ -122,7 +130,43 @@ const createBooking = async (req, res, next) => {
   }
 };
 
+const updateBookingStatus = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (isDbConnected()) {
+      const booking = await Booking.findByIdAndUpdate(id, { status }, { new: true }).lean();
+
+      if (!booking) {
+        return res.status(404).json({ message: 'Booking not found.' });
+      }
+
+      return res.json({
+        message: 'Booking status updated successfully.',
+        booking,
+      });
+    }
+
+    const booking = bookings.find((item) => item.id === id);
+
+    if (!booking) {
+      return res.status(404).json({ message: 'Booking not found.' });
+    }
+
+    booking.status = status;
+
+    return res.json({
+      message: 'Booking status updated successfully.',
+      booking,
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
 module.exports = {
   getBookings,
   createBooking,
+  updateBookingStatus,
 };

@@ -27,6 +27,10 @@ const serviceSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
+    availability: {
+      type: [String],
+      default: [],
+    },
     rating: {
       type: Number,
       default: 0,

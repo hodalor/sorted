@@ -17,14 +17,16 @@ const seedDatabase = async () => {
   const userMap = new Map();
 
   for (const user of appUsers) {
-    const passwordHash = user.seedPassword
-      ? await bcrypt.hash(user.seedPassword, 10)
-      : user.passwordHash;
+    const pinHash = user.seedPin ? await bcrypt.hash(user.seedPin, 10) : user.pinHash;
 
     const createdUser = await User.create({
       name: user.name,
+      phoneNumber: user.phoneNumber,
       email: user.email,
-      passwordHash,
+      address: user.address,
+      pinHash,
+      isPhoneVerified: user.isPhoneVerified,
+      profileCompleted: user.profileCompleted,
       role: user.role,
     });
 
@@ -32,12 +34,10 @@ const seedDatabase = async () => {
   }
 
   const providerMap = new Map();
-  const providerUsers = [...userMap.values()].filter((user) => user.role === 'provider');
-
-  for (const [index, provider] of providers.entries()) {
+  for (const provider of providers) {
     const createdProvider = await Provider.create({
       ...provider,
-      user: providerUsers[index]?._id,
+      user: provider.userId ? userMap.get(provider.userId)?._id : undefined,
     });
 
     providerMap.set(provider.id, createdProvider);
@@ -54,6 +54,7 @@ const seedDatabase = async () => {
       category: service.category,
       city: service.city,
       rate: service.rate,
+      availability: service.availability,
       rating: service.rating,
       description: service.description,
     });
@@ -68,6 +69,7 @@ const seedDatabase = async () => {
       serviceTitle: booking.serviceTitle,
       providerName: booking.providerName,
       seekerName: booking.seekerName,
+      seekerPhone: booking.seekerPhone,
       seekerEmail: booking.seekerEmail,
       date: booking.date,
       time: booking.time,

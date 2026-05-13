@@ -1,25 +1,58 @@
 const express = require('express');
 const { body } = require('express-validator');
 
-const { login, register } = require('../controllers/authController');
+const { completeSignup, login, requestOtp, verifyOtp } = require('../controllers/authController');
 
 const router = express.Router();
 
 router.post(
-  '/register',
+  '/request-otp',
   [
-    body('name').trim().notEmpty().withMessage('Name is required.'),
-    body('email').isEmail().withMessage('A valid email is required.'),
-    body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters.'),
+    body('phoneNumber')
+      .trim()
+      .isLength({ min: 10 })
+      .withMessage('A valid phone number is required.'),
   ],
-  register
+  requestOtp
+);
+
+router.post(
+  '/verify-otp',
+  [
+    body('phoneNumber')
+      .trim()
+      .isLength({ min: 10 })
+      .withMessage('A valid phone number is required.'),
+    body('otpToken').trim().notEmpty().withMessage('otpToken is required.'),
+    body('otpCode').trim().isLength({ min: 4, max: 4 }).withMessage('otpCode must be 4 digits.'),
+  ],
+  verifyOtp
+);
+
+router.post(
+  '/complete-signup',
+  [
+    body('verificationToken').trim().notEmpty().withMessage('verificationToken is required.'),
+    body('phoneNumber')
+      .trim()
+      .isLength({ min: 10 })
+      .withMessage('A valid phone number is required.'),
+    body('pin').trim().isLength({ min: 4, max: 4 }).withMessage('PIN must be 4 digits.'),
+    body('name').trim().notEmpty().withMessage('Name is required.'),
+    body('address').trim().notEmpty().withMessage('Address is required.'),
+    body('email').optional({ values: 'falsy' }).isEmail().withMessage('Email must be valid.'),
+  ],
+  completeSignup
 );
 
 router.post(
   '/login',
   [
-    body('email').isEmail().withMessage('A valid email is required.'),
-    body('password').notEmpty().withMessage('Password is required.'),
+    body('phoneNumber')
+      .trim()
+      .isLength({ min: 10 })
+      .withMessage('A valid phone number is required.'),
+    body('pin').trim().isLength({ min: 4, max: 4 }).withMessage('PIN must be 4 digits.'),
   ],
   login
 );

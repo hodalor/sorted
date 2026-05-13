@@ -11,6 +11,25 @@ const providerSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    businessName: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    isRegisteredBusiness: {
+      type: Boolean,
+      default: false,
+    },
+    registrationNumber: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    serviceTitle: {
+      type: String,
+      required: true,
+      trim: true,
+    },
     category: {
       type: String,
       required: true,
@@ -41,6 +60,14 @@ const providerSchema = new mongoose.Schema(
     bio: {
       type: String,
       default: '',
+    },
+    profilePictureUrl: {
+      type: String,
+      default: '',
+    },
+    workPhotos: {
+      type: [String],
+      default: [],
     },
     completedJobs: {
       type: Number,

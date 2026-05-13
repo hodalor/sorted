@@ -22,10 +22,14 @@ const bookingSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    seekerEmail: {
+    seekerPhone: {
       type: String,
       required: true,
+    },
+    seekerEmail: {
+      type: String,
       lowercase: true,
+      default: '',
     },
     date: {
       type: String,

@@ -84,7 +84,14 @@ const getProviders = async (req, res, next) => {
         query.status = status;
       }
 
-      const items = await Provider.find(query).sort({ rating: -1, createdAt: -1 }).lean();
+      const providerDocs = await Provider.find(query).sort({ rating: -1, createdAt: -1 }).lean();
+      const providerIds = providerDocs.map((provider) => String(provider._id));
+      const serviceDocs = await Service.find({ provider: { $in: providerIds } }).lean();
+      const serviceMap = new Map(serviceDocs.map((service) => [String(service.provider), String(service._id)]));
+      const items = providerDocs.map((provider) => ({
+        ...provider,
+        serviceId: serviceMap.get(String(provider._id)) || null,
+      }));
 
       return res.json({
         total: items.length,
@@ -101,7 +108,10 @@ const getProviders = async (req, res, next) => {
 
     return res.json({
       total: filteredProviders.length,
-      items: filteredProviders,
+      items: filteredProviders.map((provider) => ({
+        ...provider,
+        serviceId: `svc-${provider.id}`,
+      })),
     });
   } catch (error) {
     return next(error);

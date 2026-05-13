@@ -37,6 +37,23 @@ function SettingsPage({
         ))}
       </div>
 
+      {activeTab === 'general' ? (
+        <div className="settings-form">
+          <label className="setting-line">
+            <span>otpProvider</span>
+            <select
+              value={String(platformSettings.general?.otpProvider || 'firebase')}
+              onChange={(event) => onPlatformChange('general', 'otpProvider', event.target.value)}>
+              <option value="firebase">firebase</option>
+              <option value="system">system</option>
+            </select>
+          </label>
+          <button className="primary-btn" onClick={() => onPlatformSave('general')}>
+            Save General Settings
+          </button>
+        </div>
+      ) : null}
+
       {activeTab === 'category' ? (
         <div className="settings-grid">
           <div className="settings-form">
@@ -123,22 +140,15 @@ function SettingsPage({
         </div>
       ) : null}
 
-      {activeTab !== 'category' && activeTab !== 'country' ? (
+      {activeTab !== 'general' && activeTab !== 'category' && activeTab !== 'country' ? (
         <div className="settings-form">
           {Object.entries(platformSettings[activeTab] || {}).map(([key, value]) => (
             <label className="setting-line" key={key}>
               <span>{key}</span>
-              {key === 'otpProvider' ? (
-                <select value={String(value)} onChange={(event) => onPlatformChange(activeTab, key, event.target.value)}>
-                  <option value="firebase">firebase</option>
-                  <option value="system">system</option>
-                </select>
-              ) : (
-                <select value={String(value)} onChange={(event) => onPlatformChange(activeTab, key, event.target.value)}>
-                  <option value="true">true</option>
-                  <option value="false">false</option>
-                </select>
-              )}
+              <select value={String(value)} onChange={(event) => onPlatformChange(activeTab, key, event.target.value)}>
+                <option value="true">true</option>
+                <option value="false">false</option>
+              </select>
             </label>
           ))}
           <button className="primary-btn" onClick={() => onPlatformSave(activeTab)}>

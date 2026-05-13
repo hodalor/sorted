@@ -14,7 +14,7 @@ import './styles/admin.css';
 function App() {
   const [activeMenu, setActiveMenu] = useState('overview');
   const [providerTab, setProviderTab] = useState('pending');
-  const [settingsTab, setSettingsTab] = useState('category');
+  const [settingsTab, setSettingsTab] = useState('general');
   const [dashboard, setDashboard] = useState(null);
   const [users, setUsers] = useState([]);
   const [providers, setProviders] = useState([]);
@@ -22,7 +22,7 @@ function App() {
   const [reviews, setReviews] = useState([]);
   const [categories, setCategories] = useState([]);
   const [countries, setCountries] = useState([]);
-  const [platformSettings, setPlatformSettings] = useState({ mobile: {}, web: {} });
+  const [platformSettings, setPlatformSettings] = useState({ general: {}, mobile: {}, web: {} });
   const [categoryForm, setCategoryForm] = useState({ name: '', icon: '' });
   const [countryForm, setCountryForm] = useState({
     name: '',
@@ -47,7 +47,7 @@ function App() {
 
   const loadCore = async () => {
     try {
-      const [dashboardData, userData, bookingData, reviewData, categoryData, countryData, mobileData, webData] =
+      const [dashboardData, userData, bookingData, reviewData, categoryData, countryData, generalData, mobileData, webData] =
         await Promise.all([
           apiGet('/dashboard/overview'),
           apiGet('/users'),
@@ -55,6 +55,7 @@ function App() {
           apiGet('/reviews'),
           apiGet('/categories'),
           apiGet('/countries'),
+          apiGet('/settings/general'),
           apiGet('/settings/mobile'),
           apiGet('/settings/web'),
         ]);
@@ -65,7 +66,7 @@ function App() {
       setReviews(reviewData.items);
       setCategories(categoryData.items);
       setCountries(countryData.items);
-      setPlatformSettings({ mobile: mobileData.values, web: webData.values });
+      setPlatformSettings({ general: generalData.values, mobile: mobileData.values, web: webData.values });
       setStatusMessage('Admin synced successfully.');
     } catch (error) {
       setStatusMessage(error.message);

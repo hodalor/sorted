@@ -1,12 +1,37 @@
+import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
-const stats = [
-  { label: 'Bookings completed', value: '42' },
-  { label: 'Saved providers', value: '11' },
-  { label: 'Reviews posted', value: '8' },
-];
+import { apiGet } from '@/lib/api';
 
 export default function ProfileScreen() {
+  const [stats, setStats] = useState([
+    { label: 'Bookings completed', value: '0' },
+    { label: 'Saved providers', value: '0' },
+    { label: 'Reviews posted', value: '0' },
+  ]);
+
+  useEffect(() => {
+    const loadProfileStats = async () => {
+      try {
+        const [bookingData, reviewData, providerData] = await Promise.all([
+          apiGet('/bookings?seekerEmail=seeker@sorted.app'),
+          apiGet('/reviews'),
+          apiGet('/services/providers?status=approved'),
+        ]);
+
+        setStats([
+          { label: 'Bookings completed', value: String(bookingData.total) },
+          { label: 'Saved providers', value: String(providerData.total) },
+          { label: 'Reviews posted', value: String(reviewData.total) },
+        ]);
+      } catch {
+        setStats((current) => current);
+      }
+    };
+
+    loadProfileStats();
+  }, []);
+
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <View style={styles.profileCard}>

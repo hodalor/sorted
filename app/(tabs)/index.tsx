@@ -1,20 +1,68 @@
-import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
-const categories = [
-  { name: 'Mechanic', available: 12, color: '#fbbf24' },
-  { name: 'Electrician', available: 8, color: '#f59e0b' },
-  { name: 'Plumber', available: 6, color: '#93c5fd' },
-  { name: 'Barber', available: 20, color: '#84cc16' },
-  { name: 'Cleaner', available: 9, color: '#67e8f9' },
-  { name: 'Tailor', available: 5, color: '#a3e635' },
-];
+import { apiGet, apiPost } from '@/lib/api';
 
-const providers = [
-  { name: 'Emmanuel Auto Works', role: 'Mechanic', rate: '$45/hr', rating: '4.9' },
-  { name: 'Aisha Home Care', role: 'Cleaner', rate: '$22/hr', rating: '4.8' },
-];
+const colors = ['#fbbf24', '#f59e0b', '#93c5fd', '#84cc16', '#67e8f9', '#a3e635'];
 
 export default function HomeScreen() {
+  const [search, setSearch] = useState('');
+  const [categories, setCategories] = useState<{ name: string; available: number }[]>([]);
+  const [providers, setProviders] = useState<
+    { id?: string; _id?: string; name: string; category: string; rate: number; rating: number; bio: string }[]
+  >([]);
+  const [message, setMessage] = useState('Loading services...');
+
+  const filteredProviders = useMemo(() => {
+    if (!search.trim()) {
+      return providers;
+    }
+
+    const query = search.toLowerCase();
+    return providers.filter(
+      (provider) =>
+        provider.name.toLowerCase().includes(query) || provider.category.toLowerCase().includes(query)
+    );
+  }, [providers, search]);
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const [categoryData, providerData] = await Promise.all([
+          apiGet('/services/categories'),
+          apiGet('/services/providers?status=approved'),
+        ]);
+
+        setCategories(categoryData.items);
+        setProviders(providerData.items);
+        setMessage('Synced with shared backend.');
+      } catch (error) {
+        setMessage(error instanceof Error ? error.message : 'Could not load services.');
+      }
+    };
+
+    loadData();
+  }, []);
+
+  const handleBooking = async (provider: { id?: string; _id?: string; name: string }) => {
+    try {
+      const providerId = provider.id || provider._id;
+
+      await apiPost('/bookings', {
+        serviceId: `svc-${providerId}`,
+        providerId,
+        seekerName: 'Kojo Osei',
+        seekerEmail: 'seeker@sorted.app',
+        date: '2026-05-20',
+        time: '10:00',
+      });
+
+      setMessage(`Booked ${provider.name} successfully.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Could not create booking.');
+    }
+  };
+
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <View style={styles.hero}>
@@ -33,6 +81,8 @@ export default function HomeScreen() {
           placeholder="Mechanic, cleaner, barber..."
           placeholderTextColor="#64748b"
           style={styles.input}
+          value={search}
+          onChangeText={setSearch}
         />
       </View>
 
@@ -42,10 +92,12 @@ export default function HomeScreen() {
       </View>
 
       <View style={styles.grid}>
-        {categories.map((item) => (
+        {categories.map((item, index) => (
           <View key={item.name} style={styles.categoryCard}>
-            <View style={[styles.categoryIcon, { borderColor: item.color }]}>
-              <Text style={[styles.categoryIconText, { color: item.color }]}>{item.name[0]}</Text>
+            <View style={[styles.categoryIcon, { borderColor: colors[index % colors.length] }]}>
+              <Text style={[styles.categoryIconText, { color: colors[index % colors.length] }]}>
+                {item.name[0]}
+              </Text>
             </View>
             <Text style={styles.cardTitle}>{item.name}</Text>
             <Text style={styles.cardMeta}>{item.available} available</Text>
@@ -59,21 +111,29 @@ export default function HomeScreen() {
       </View>
 
       <View style={styles.list}>
-        {providers.map((provider) => (
+        {filteredProviders.map((provider) => (
           <View key={provider.name} style={styles.providerCard}>
             <View style={styles.providerHead}>
               <View>
                 <Text style={styles.cardTitle}>{provider.name}</Text>
-                <Text style={styles.cardMeta}>{provider.role}</Text>
+                <Text style={styles.cardMeta}>{provider.category}</Text>
               </View>
               <View style={styles.ratingPill}>
                 <Text style={styles.ratingText}>{provider.rating}</Text>
               </View>
             </View>
-            <Text style={styles.cardMeta}>Available today • {provider.rate}</Text>
+            <Text style={styles.cardMeta}>{provider.bio}</Text>
+            <View style={styles.providerFooter}>
+              <Text style={styles.cardMeta}>Available today • ${provider.rate}/hr</Text>
+              <TouchableOpacity style={styles.bookButton} onPress={() => handleBooking(provider)}>
+                <Text style={styles.bookButtonText}>Book</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         ))}
       </View>
+
+      <Text style={styles.message}>{message}</Text>
     </ScrollView>
   );
 }
@@ -195,6 +255,12 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(148, 163, 184, 0.16)',
     gap: 10,
   },
+  providerFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 12,
+  },
   providerHead: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -211,5 +277,20 @@ const styles = StyleSheet.create({
   ratingText: {
     color: '#fde68a',
     fontWeight: '700',
+  },
+  bookButton: {
+    borderRadius: 999,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: '#1d4ed8',
+  },
+  bookButtonText: {
+    color: '#eff6ff',
+    fontWeight: '700',
+  },
+  message: {
+    color: '#cbd5e1',
+    textAlign: 'center',
+    lineHeight: 20,
   },
 });

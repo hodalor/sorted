@@ -1,21 +1,36 @@
+import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
-const jobs = [
-  {
-    title: 'Electrical rewiring',
-    provider: 'SparkFix Electrical',
-    schedule: 'Tomorrow • 9:00 AM',
-    status: 'Confirmed',
-  },
-  {
-    title: 'Kitchen sink repair',
-    provider: 'Kwame Plumbing',
-    schedule: 'Friday • 2:30 PM',
-    status: 'Pending',
-  },
-];
+import { apiGet } from '@/lib/api';
 
 export default function BookingsScreen() {
+  const [jobs, setJobs] = useState<
+    {
+      id?: string;
+      _id?: string;
+      serviceTitle: string;
+      providerName: string;
+      date: string;
+      time: string;
+      status: string;
+    }[]
+  >([]);
+  const [message, setMessage] = useState('Loading bookings...');
+
+  useEffect(() => {
+    const loadBookings = async () => {
+      try {
+        const bookingData = await apiGet('/bookings?seekerEmail=seeker@sorted.app');
+        setJobs(bookingData.items);
+        setMessage('Your bookings are synced.');
+      } catch (error) {
+        setMessage(error instanceof Error ? error.message : 'Could not load bookings.');
+      }
+    };
+
+    loadBookings();
+  }, []);
+
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <Text style={styles.eyebrow}>Bookings</Text>
@@ -26,16 +41,20 @@ export default function BookingsScreen() {
 
       <View style={styles.list}>
         {jobs.map((job) => (
-          <View key={job.title} style={styles.card}>
+          <View key={job.id || job._id} style={styles.card}>
             <View style={styles.row}>
-              <Text style={styles.cardTitle}>{job.title}</Text>
+              <Text style={styles.cardTitle}>{job.serviceTitle}</Text>
               <Text style={styles.status}>{job.status}</Text>
             </View>
-            <Text style={styles.meta}>{job.provider}</Text>
-            <Text style={styles.meta}>{job.schedule}</Text>
+            <Text style={styles.meta}>{job.providerName}</Text>
+            <Text style={styles.meta}>
+              {job.date} • {job.time}
+            </Text>
           </View>
         ))}
       </View>
+
+      <Text style={styles.message}>{message}</Text>
     </ScrollView>
   );
 }
@@ -95,5 +114,9 @@ const styles = StyleSheet.create({
   meta: {
     color: '#cbd5e1',
     lineHeight: 20,
+  },
+  message: {
+    color: '#cbd5e1',
+    textAlign: 'center',
   },
 });

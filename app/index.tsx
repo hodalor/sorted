@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { FirebaseAuthTypes } from '@react-native-firebase/auth';
 
@@ -10,7 +10,7 @@ import {
   getFirebasePhoneErrorMessage,
   requestPhoneVerification,
 } from '@/lib/firebase-phone';
-import { apiPost } from '@/lib/api';
+import { apiGet, apiPost } from '@/lib/api';
 
 const signupDefaults = {
   phoneNumber: '',
@@ -26,6 +26,7 @@ const signupDefaults = {
 export default function AuthScreen() {
   const router = useRouter();
   const { setSession } = useAuth();
+  const [otpProvider, setOtpProvider] = useState<'firebase' | 'system'>('firebase');
   const [step, setStep] = useState<'login' | 'signup-phone' | 'signup-otp' | 'signup-profile'>('login');
   const [loginForm, setLoginForm] = useState({
     phoneNumber: '+233240000001',
@@ -34,6 +35,23 @@ export default function AuthScreen() {
   const [signupForm, setSignupForm] = useState(signupDefaults);
   const [message, setMessage] = useState('Login with phone number and 4-digit PIN.');
   const phoneConfirmationRef = useRef<FirebaseAuthTypes.ConfirmationResult | null>(null);
+
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const response = await apiGet('/settings/mobile');
+        const provider = response?.values?.otpProvider;
+
+        if (provider === 'firebase' || provider === 'system') {
+          setOtpProvider(provider);
+        }
+      } catch {
+        // Keep the built-in Firebase fallback when settings are unavailable.
+      }
+    };
+
+    loadSettings();
+  }, []);
 
   const handleLogin = async () => {
     try {
@@ -48,6 +66,19 @@ export default function AuthScreen() {
 
   const handleRequestOtp = async () => {
     try {
+      if (otpProvider === 'system') {
+        const response = await apiPost('/auth/request-otp', {
+          phoneNumber: signupForm.phoneNumber,
+        });
+        setSignupForm((current) => ({
+          ...current,
+          otpToken: response.otpToken,
+        }));
+        setStep('signup-otp');
+        setMessage(`System OTP: ${response.otpCode}`);
+        return;
+      }
+
       phoneConfirmationRef.current = await requestPhoneVerification(signupForm.phoneNumber);
       setStep('signup-otp');
       setMessage('Verification code sent to your phone.');
@@ -58,6 +89,21 @@ export default function AuthScreen() {
 
   const handleVerifyOtp = async () => {
     try {
+      if (otpProvider === 'system') {
+        const response = await apiPost('/auth/verify-otp', {
+          phoneNumber: signupForm.phoneNumber,
+          otpToken: signupForm.otpToken,
+          otpCode: signupForm.otpCode,
+        });
+        setSignupForm((current) => ({
+          ...current,
+          verificationToken: response.verificationToken,
+        }));
+        setStep('signup-profile');
+        setMessage(response.message);
+        return;
+      }
+
       if (!phoneConfirmationRef.current) {
         setMessage('Request a verification code first.');
         return;
@@ -143,7 +189,11 @@ export default function AuthScreen() {
 
         {step === 'signup-phone' ? (
           <View style={styles.form}>
-            <Text style={styles.hint}>Firebase will text a verification code to this number.</Text>
+            <Text style={styles.hint}>
+              {otpProvider === 'system'
+                ? 'Request OTP to generate a system code, then verify it before finishing your profile.'
+                : 'Firebase will text a verification code to this number.'}
+            </Text>
             <TextInput
               value={signupForm.phoneNumber}
               onChangeText={(phoneNumber) => setSignupForm((current) => ({ ...current, phoneNumber }))}
@@ -163,7 +213,11 @@ export default function AuthScreen() {
 
         {step === 'signup-otp' ? (
           <View style={styles.form}>
-            <Text style={styles.hint}>Enter the SMS code sent by Firebase.</Text>
+            <Text style={styles.hint}>
+              {otpProvider === 'system'
+                ? 'Enter the system-generated OTP shown on the screen.'
+                : 'Enter the SMS code sent by Firebase.'}
+            </Text>
             <TextInput
               value={signupForm.otpCode}
               onChangeText={(otpCode) => setSignupForm((current) => ({ ...current, otpCode }))}

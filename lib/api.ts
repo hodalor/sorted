@@ -29,3 +29,15 @@ export const apiPost = async (path: string, body: Record<string, unknown>) => {
 
   return handleResponse(response);
 };
+
+export const apiPatch = async (path: string, body: Record<string, unknown>) => {
+  const response = await fetch(`${apiBaseUrl}${path}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+
+  return handleResponse(response);
+};

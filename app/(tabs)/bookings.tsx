@@ -1,9 +1,13 @@
 import { useEffect, useState } from 'react';
+import { useRouter } from 'expo-router';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { useAuth } from '@/context/auth-context';
 import { apiGet } from '@/lib/api';
 
 export default function BookingsScreen() {
+  const router = useRouter();
+  const { session } = useAuth();
   const [jobs, setJobs] = useState<
     {
       id?: string;
@@ -18,9 +22,15 @@ export default function BookingsScreen() {
   const [message, setMessage] = useState('Loading bookings...');
 
   useEffect(() => {
+    if (!session?.user) {
+      setMessage('Login first to view your bookings.');
+      router.replace('/');
+      return;
+    }
+
     const loadBookings = async () => {
       try {
-        const bookingData = await apiGet('/bookings?seekerEmail=seeker@sorted.app');
+        const bookingData = await apiGet(`/bookings?seekerPhone=${encodeURIComponent(session.user.phoneNumber)}`);
         setJobs(bookingData.items);
         setMessage('Your bookings are synced.');
       } catch (error) {
@@ -29,7 +39,11 @@ export default function BookingsScreen() {
     };
 
     loadBookings();
-  }, []);
+  }, [session]);
+
+  if (!session?.user) {
+    return null;
+  }
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>

@@ -1,15 +1,28 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useRouter } from 'expo-router';
 
+import { useAuth } from '@/context/auth-context';
 import { apiGet, apiPost } from '@/lib/api';
 
 const colors = ['#fbbf24', '#f59e0b', '#93c5fd', '#84cc16', '#67e8f9', '#a3e635'];
 
 export default function HomeScreen() {
+  const router = useRouter();
+  const { session } = useAuth();
   const [search, setSearch] = useState('');
   const [categories, setCategories] = useState<{ name: string; available: number }[]>([]);
   const [providers, setProviders] = useState<
-    { id?: string; _id?: string; name: string; category: string; rate: number; rating: number; bio: string }[]
+    {
+      id?: string;
+      _id?: string;
+      serviceId?: string;
+      name: string;
+      category: string;
+      rate: number;
+      rating: number;
+      bio: string;
+    }[]
   >([]);
   const [message, setMessage] = useState('Loading services...');
 
@@ -26,6 +39,11 @@ export default function HomeScreen() {
   }, [providers, search]);
 
   useEffect(() => {
+    if (!session?.user) {
+      setMessage('Login first to book services.');
+      return;
+    }
+
     const loadData = async () => {
       try {
         const [categoryData, providerData] = await Promise.all([
@@ -42,17 +60,23 @@ export default function HomeScreen() {
     };
 
     loadData();
-  }, []);
+  }, [session]);
 
   const handleBooking = async (provider: { id?: string; _id?: string; name: string }) => {
     try {
+      if (!session?.user) {
+        router.replace('/');
+        return;
+      }
+
       const providerId = provider.id || provider._id;
 
       await apiPost('/bookings', {
-        serviceId: `svc-${providerId}`,
+        serviceId: (provider as { serviceId?: string }).serviceId,
         providerId,
-        seekerName: 'Kojo Osei',
-        seekerEmail: 'seeker@sorted.app',
+        seekerName: session.user.name,
+        seekerPhone: session.user.phoneNumber,
+        seekerEmail: session.user.email,
         date: '2026-05-20',
         time: '10:00',
       });
@@ -63,6 +87,18 @@ export default function HomeScreen() {
     }
   };
 
+  if (!session?.user) {
+    return (
+      <View style={styles.emptyState}>
+        <Text style={styles.title}>Login required</Text>
+        <Text style={styles.cardMeta}>Return to the first screen to login or create your account.</Text>
+        <TouchableOpacity style={styles.bookButton} onPress={() => router.replace('/')}>
+          <Text style={styles.bookButtonText}>Go to login</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <View style={styles.hero}>
@@ -71,7 +107,7 @@ export default function HomeScreen() {
           <Text style={styles.title}>What do you need?</Text>
         </View>
         <View style={styles.avatar}>
-          <Text style={styles.avatarText}>KO</Text>
+          <Text style={styles.avatarText}>{session.user.name.slice(0, 2).toUpperCase()}</Text>
         </View>
       </View>
 
@@ -139,6 +175,13 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
+  emptyState: {
+    flex: 1,
+    backgroundColor: '#020617',
+    padding: 20,
+    justifyContent: 'center',
+    gap: 16,
+  },
   screen: {
     flex: 1,
     backgroundColor: '#020617',

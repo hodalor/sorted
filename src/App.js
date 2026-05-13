@@ -150,7 +150,7 @@ function App() {
       ...current,
       [platform]: {
         ...current[platform],
-        [key]: value === 'true',
+        [key]: typeof current[platform][key] === 'boolean' ? value === 'true' : value,
       },
     }));
   };

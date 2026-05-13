@@ -128,10 +128,17 @@ function SettingsPage({
           {Object.entries(platformSettings[activeTab] || {}).map(([key, value]) => (
             <label className="setting-line" key={key}>
               <span>{key}</span>
-              <select value={String(value)} onChange={(event) => onPlatformChange(activeTab, key, event.target.value)}>
-                <option value="true">true</option>
-                <option value="false">false</option>
-              </select>
+              {key === 'otpProvider' ? (
+                <select value={String(value)} onChange={(event) => onPlatformChange(activeTab, key, event.target.value)}>
+                  <option value="firebase">firebase</option>
+                  <option value="system">system</option>
+                </select>
+              ) : (
+                <select value={String(value)} onChange={(event) => onPlatformChange(activeTab, key, event.target.value)}>
+                  <option value="true">true</option>
+                  <option value="false">false</option>
+                </select>
+              )}
             </label>
           ))}
           <button className="primary-btn" onClick={() => onPlatformSave(activeTab)}>

@@ -1,6 +1,6 @@
 function AuthPage({
   authStep,
-  countryCodeOptions,
+  countryOptions,
   loginForm,
   signupForm,
   authLoading,
@@ -26,9 +26,9 @@ function AuthPage({
         <div className="auth-card">
           <div className="phone-input-row">
             <select name="countryCode" value={loginForm.countryCode} onChange={onLoginChange}>
-              {countryCodeOptions.map((code) => (
-                <option key={code} value={code}>
-                  {code}
+              {countryOptions.map((country) => (
+                <option key={`${country.code}-${country.dialingCode}`} value={country.dialingCode}>
+                  {country.dialingCode}
                 </option>
               ))}
             </select>
@@ -63,9 +63,9 @@ function AuthPage({
           <p className="auth-hint">Firebase will text a verification code to this number.</p>
           <div className="phone-input-row">
             <select name="countryCode" value={signupForm.countryCode} onChange={onSignupChange}>
-              {countryCodeOptions.map((code) => (
-                <option key={code} value={code}>
-                  {code}
+              {countryOptions.map((country) => (
+                <option key={`${country.code}-${country.dialingCode}`} value={country.dialingCode}>
+                  {country.dialingCode}
                 </option>
               ))}
             </select>

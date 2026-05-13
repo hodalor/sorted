@@ -90,6 +90,10 @@ export const getFirebasePhoneErrorMessage = (error) => {
     return 'reCAPTCHA verification failed. Refresh the page and try requesting the code again.';
   }
 
+  if (message.includes('billing-not-enabled')) {
+    return 'Firebase phone auth billing is not enabled for this project. Enable billing in Firebase or Google Cloud before OTP can be sent.';
+  }
+
   return message;
 };
 

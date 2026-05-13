@@ -44,6 +44,10 @@ const providerDefaults = {
   availability: 'Mon 09:00, Tue 14:00, Thu 10:00',
 };
 
+const defaultCountryOptions = [
+  { code: 'GH', dialingCode: '+233', currencySymbol: 'GHS', name: 'Ghana' },
+];
+
 function App() {
   const [authStep, setAuthStep] = useState('login');
   const [activeMenu, setActiveMenu] = useState('home');
@@ -53,6 +57,7 @@ function App() {
     pin: '1234',
   });
   const [signupForm, setSignupForm] = useState(signupDefaults);
+  const [countryOptions, setCountryOptions] = useState(defaultCountryOptions);
   const [authLoading, setAuthLoading] = useState({
     login: false,
     requestOtp: false,
@@ -75,8 +80,6 @@ function App() {
   const [statusMessage, setStatusMessage] = useState('Use phone number and 4-digit PIN to continue.');
   const recaptchaVerifierRef = useRef(null);
   const phoneConfirmationRef = useRef(null);
-  const countryCodeOptions = ['+233', '+234', '+254', '+27', '+1', '+44'];
-
   const formatPhoneNumber = (countryCode, value) => {
     const trimmedValue = value.trim();
 
@@ -147,6 +150,37 @@ function App() {
       loadPortalData(session);
     }
   }, [session]);
+
+  useEffect(() => {
+    const loadCountries = async () => {
+      try {
+        const response = await apiGet('/countries');
+        const enabledCountries = (response.items || []).filter((item) => item.enabled !== false);
+
+        if (!enabledCountries.length) {
+          return;
+        }
+
+        setCountryOptions(enabledCountries);
+        setLoginForm((current) => ({
+          ...current,
+          countryCode: enabledCountries.some((item) => item.dialingCode === current.countryCode)
+            ? current.countryCode
+            : enabledCountries[0].dialingCode,
+        }));
+        setSignupForm((current) => ({
+          ...current,
+          countryCode: enabledCountries.some((item) => item.dialingCode === current.countryCode)
+            ? current.countryCode
+            : enabledCountries[0].dialingCode,
+        }));
+      } catch (_error) {
+        // Keep the built-in Ghana fallback if the settings endpoint is unavailable.
+      }
+    };
+
+    loadCountries();
+  }, []);
 
   useEffect(() => {
     if (authStep !== 'signup-phone') {
@@ -426,7 +460,7 @@ function App() {
         <main className="mobile-frame auth-frame">
           <AuthPage
             authStep={authStep}
-            countryCodeOptions={countryCodeOptions}
+            countryOptions={countryOptions}
             loginForm={loginForm}
             signupForm={signupForm}
             authLoading={authLoading}

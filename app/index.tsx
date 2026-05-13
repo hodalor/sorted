@@ -1,8 +1,15 @@
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { FirebaseAuthTypes } from '@react-native-firebase/auth';
 
 import { useAuth } from '@/context/auth-context';
+import {
+  clearFirebasePhoneSession,
+  confirmPhoneVerificationCode,
+  getFirebasePhoneErrorMessage,
+  requestPhoneVerification,
+} from '@/lib/firebase-phone';
 import { apiPost } from '@/lib/api';
 
 const signupDefaults = {
@@ -26,6 +33,7 @@ export default function AuthScreen() {
   });
   const [signupForm, setSignupForm] = useState(signupDefaults);
   const [message, setMessage] = useState('Login with phone number and 4-digit PIN.');
+  const phoneConfirmationRef = useRef<FirebaseAuthTypes.ConfirmationResult | null>(null);
 
   const handleLogin = async () => {
     try {
@@ -40,35 +48,35 @@ export default function AuthScreen() {
 
   const handleRequestOtp = async () => {
     try {
-      const response = await apiPost('/auth/request-otp', {
-        phoneNumber: signupForm.phoneNumber,
-      });
-      setSignupForm((current) => ({
-        ...current,
-        otpToken: response.otpToken,
-      }));
+      phoneConfirmationRef.current = await requestPhoneVerification(signupForm.phoneNumber);
       setStep('signup-otp');
-      setMessage(`OTP sent. Demo code: ${response.otpCode}`);
+      setMessage('Verification code sent to your phone.');
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Could not request OTP.');
+      setMessage(getFirebasePhoneErrorMessage(error, 'Could not request OTP.'));
     }
   };
 
   const handleVerifyOtp = async () => {
     try {
-      const response = await apiPost('/auth/verify-otp', {
+      if (!phoneConfirmationRef.current) {
+        setMessage('Request a verification code first.');
+        return;
+      }
+
+      const idToken = await confirmPhoneVerificationCode(phoneConfirmationRef.current, signupForm.otpCode);
+      const response = await apiPost('/auth/verify-firebase-phone', {
+        idToken,
         phoneNumber: signupForm.phoneNumber,
-        otpToken: signupForm.otpToken,
-        otpCode: signupForm.otpCode,
       });
       setSignupForm((current) => ({
         ...current,
+        phoneNumber: response.phoneNumber,
         verificationToken: response.verificationToken,
       }));
       setStep('signup-profile');
       setMessage(response.message);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Could not verify OTP.');
+      setMessage(getFirebasePhoneErrorMessage(error, 'Could not verify OTP.'));
     }
   };
 
@@ -84,6 +92,8 @@ export default function AuthScreen() {
       });
       setSession(response);
       setMessage(response.message);
+      phoneConfirmationRef.current = null;
+      await clearFirebasePhoneSession();
       router.replace('/(tabs)');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Could not finish signup.');
@@ -133,6 +143,7 @@ export default function AuthScreen() {
 
         {step === 'signup-phone' ? (
           <View style={styles.form}>
+            <Text style={styles.hint}>Firebase will text a verification code to this number.</Text>
             <TextInput
               value={signupForm.phoneNumber}
               onChangeText={(phoneNumber) => setSignupForm((current) => ({ ...current, phoneNumber }))}
@@ -152,6 +163,7 @@ export default function AuthScreen() {
 
         {step === 'signup-otp' ? (
           <View style={styles.form}>
+            <Text style={styles.hint}>Enter the SMS code sent by Firebase.</Text>
             <TextInput
               value={signupForm.otpCode}
               onChangeText={(otpCode) => setSignupForm((current) => ({ ...current, otpCode }))}
@@ -248,6 +260,10 @@ const styles = StyleSheet.create({
   },
   form: {
     gap: 12,
+  },
+  hint: {
+    color: '#cbd5e1',
+    lineHeight: 20,
   },
   input: {
     borderRadius: 16,

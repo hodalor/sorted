@@ -1,0 +1,36 @@
+import auth, { FirebaseAuthTypes } from '@react-native-firebase/auth';
+
+export const requestPhoneVerification = async (phoneNumber: string) => auth().signInWithPhoneNumber(phoneNumber);
+
+export const confirmPhoneVerificationCode = async (
+  confirmation: FirebaseAuthTypes.ConfirmationResult,
+  otpCode: string
+) => {
+  const credential = await confirmation.confirm(otpCode);
+
+  if (!credential || !credential.user) {
+    throw new Error('Firebase could not confirm the phone number.');
+  }
+
+  return credential.user.getIdToken();
+};
+
+export const clearFirebasePhoneSession = async () => {
+  if (!auth().currentUser) {
+    return;
+  }
+
+  await auth().signOut();
+};
+
+export const getFirebasePhoneErrorMessage = (error: unknown, fallback: string) => {
+  if (error instanceof Error) {
+    if (error.message.includes('No Firebase App')) {
+      return 'Firebase mobile config is missing. Add the Android and iOS Firebase files, then rebuild the app.';
+    }
+
+    return error.message;
+  }
+
+  return fallback;
+};

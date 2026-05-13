@@ -1,35 +1,6 @@
+import { useEffect, useState } from 'react';
+import { apiGet, apiPatch } from './api';
 import './App.css';
-
-const metrics = [
-  { label: 'Total bookings', value: '12.4k', delta: '+18% this month' },
-  { label: 'Active providers', value: '1,284', delta: '+76 added this week' },
-  { label: 'Open disputes', value: '24', delta: '6 need urgent attention' },
-  { label: 'Platform revenue', value: '$48,920', delta: '+11% vs last month' },
-];
-
-const approvalQueue = [
-  {
-    name: 'Kwame Plumbing Services',
-    category: 'Plumber',
-    city: 'Accra',
-    status: 'Pending KYC',
-    rate: '$40/hr',
-  },
-  {
-    name: 'Ama Beauty Studio',
-    category: 'Barber',
-    city: 'Tema',
-    status: 'Pending portfolio review',
-    rate: '$28/hr',
-  },
-  {
-    name: 'SparkFix Electrical',
-    category: 'Electrician',
-    city: 'Kumasi',
-    status: 'Ready for approval',
-    rate: '$52/hr',
-  },
-];
 
 const serviceRegions = [
   { city: 'Accra', seekers: 3200, providers: 492 },
@@ -46,6 +17,75 @@ const supportTickets = [
 ];
 
 function App() {
+  const [dashboard, setDashboard] = useState(null);
+  const [approvalQueue, setApprovalQueue] = useState([]);
+  const [statusMessage, setStatusMessage] = useState('Loading admin data...');
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const [dashboardData, providerData] = await Promise.all([
+          apiGet('/dashboard/overview'),
+          apiGet('/services/providers?status=pending'),
+        ]);
+
+        setDashboard(dashboardData);
+        setApprovalQueue(providerData.items);
+        setStatusMessage('Dashboard synced with backend.');
+      } catch (error) {
+        setStatusMessage(error.message);
+      }
+    };
+
+    loadData();
+  }, []);
+
+  const metrics = dashboard
+    ? [
+        {
+          label: 'Total bookings',
+          value: dashboard.totals.bookings,
+          delta: `${dashboard.totals.pendingBookings} pending`,
+        },
+        {
+          label: 'Active providers',
+          value: dashboard.totals.providers,
+          delta: `${dashboard.totals.pendingProviders} awaiting approval`,
+        },
+        {
+          label: 'Available services',
+          value: dashboard.totals.services,
+          delta: `${dashboard.totals.categories} categories`,
+        },
+        {
+          label: 'Platform revenue',
+          value: `$${dashboard.totals.revenueEstimate}`,
+          delta: 'Shared across web and mobile',
+        },
+      ]
+    : [];
+
+  const handleApprove = async (providerId) => {
+    try {
+      await apiPatch(`/providers/${providerId}/status`, { status: 'approved' });
+      setApprovalQueue((current) => current.filter((provider) => (provider.id || provider._id) !== providerId));
+      setDashboard((current) =>
+        current
+          ? {
+              ...current,
+              totals: {
+                ...current.totals,
+                pendingProviders: Math.max(0, current.totals.pendingProviders - 1),
+              },
+            }
+          : current
+      );
+      setStatusMessage('Provider approved successfully.');
+    } catch (error) {
+      setStatusMessage(error.message);
+    }
+  };
+
   return (
     <div className="dashboard-shell">
       <aside className="sidebar">
@@ -110,7 +150,7 @@ function App() {
 
             <div className="stack">
               {approvalQueue.map((provider) => (
-                <div className="list-row" key={provider.name}>
+                <div className="list-row" key={provider.id || provider._id}>
                   <div>
                     <strong>{provider.name}</strong>
                     <p>
@@ -119,7 +159,10 @@ function App() {
                   </div>
                   <div className="row-meta">
                     <span className="pill">{provider.status}</span>
-                    <small>{provider.rate}</small>
+                    <small>${provider.rate}/hr</small>
+                    <button className="ghost-btn small" onClick={() => handleApprove(provider.id || provider._id)}>
+                      Approve
+                    </button>
                   </div>
                 </div>
               ))}
@@ -191,6 +234,8 @@ function App() {
             </div>
           </article>
         </section>
+
+        <p className="admin-status">{statusMessage}</p>
       </main>
     </div>
   );

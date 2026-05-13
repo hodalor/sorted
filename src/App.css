@@ -250,6 +250,14 @@ h2 {
   line-height: 1.5;
 }
 
+.status-banner {
+  margin: 20px 0 0;
+  color: #cbd5e1;
+  text-align: center;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
 .bottom-nav {
   position: sticky;
   bottom: 18px;

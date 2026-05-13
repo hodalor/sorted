@@ -5,6 +5,7 @@ function AuthPage({
   loginForm,
   signupForm,
   authLoading,
+  recaptchaRenderKey,
   showRecaptcha,
   statusMessage,
   onLoginChange,
@@ -84,7 +85,7 @@ function AuthPage({
             />
           </div>
           {otpProvider === 'firebase' && showRecaptcha ? (
-            <div id="firebase-recaptcha" className="firebase-recaptcha" />
+            <div key={recaptchaRenderKey} id="firebase-recaptcha" className="firebase-recaptcha" />
           ) : null}
           <button className="primary-btn full" onClick={onRequestOtp} disabled={authLoading.requestOtp}>
             {authLoading.requestOtp

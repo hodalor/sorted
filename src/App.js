@@ -81,6 +81,7 @@ function App() {
   });
   const [statusMessage, setStatusMessage] = useState('Use phone number and 4-digit PIN to continue.');
   const [showRecaptcha, setShowRecaptcha] = useState(false);
+  const [recaptchaRenderKey, setRecaptchaRenderKey] = useState(0);
   const recaptchaVerifierRef = useRef(null);
   const phoneConfirmationRef = useRef(null);
   const pendingFirebasePhoneRef = useRef('');
@@ -158,7 +159,10 @@ function App() {
   useEffect(() => {
     const loadAuthSetup = async () => {
       try {
-        const [countryResponse, settingsResponse] = await Promise.all([apiGet('/countries'), apiGet('/settings/web')]);
+        const [countryResponse, settingsResponse] = await Promise.all([
+          apiGet('/countries'),
+          apiGet('/settings/general'),
+        ]);
         const enabledCountries = (countryResponse.items || []).filter((item) => item.enabled !== false);
         const otpProvider = settingsResponse?.values?.otpProvider || defaultOtpProvider;
 
@@ -196,8 +200,28 @@ function App() {
 
     let isMounted = true;
 
+    const waitForContainer = async () => {
+      for (let attempt = 0; attempt < 10; attempt += 1) {
+        const container = document.getElementById('firebase-recaptcha');
+
+        if (container) {
+          return container;
+        }
+
+        await new Promise((resolve) => window.setTimeout(resolve, 60));
+      }
+
+      return null;
+    };
+
     const renderAndWaitForVerification = async () => {
       try {
+        const container = await waitForContainer();
+
+        if (!container) {
+          throw new Error('reCAPTCHA container could not be prepared. Try again.');
+        }
+
         const verifier = await renderPhoneRecaptcha('firebase-recaptcha', {
           callback: async () => {
             try {
@@ -343,6 +367,7 @@ function App() {
       phoneConfirmationRef.current = null;
       recaptchaVerifierRef.current = null;
       resetPhoneRecaptcha();
+      setRecaptchaRenderKey((current) => current + 1);
       setShowRecaptcha(true);
       setStatusMessage('Complete the reCAPTCHA below to send the OTP.');
     } catch (error) {
@@ -555,6 +580,7 @@ function App() {
             loginForm={loginForm}
             signupForm={signupForm}
             authLoading={authLoading}
+            recaptchaRenderKey={recaptchaRenderKey}
             showRecaptcha={showRecaptcha}
             statusMessage={statusMessage}
             onLoginChange={handleLoginChange}

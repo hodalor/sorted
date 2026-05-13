@@ -26,3 +26,23 @@ export const apiPatch = async (path, body) => {
 
   return handleResponse(response);
 };
+
+export const apiPost = async (path, body) => {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+
+  return handleResponse(response);
+};
+
+export const apiDelete = async (path) => {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'DELETE',
+  });
+
+  return handleResponse(response);
+};

@@ -1,242 +1,191 @@
-import { useEffect, useState } from 'react';
-import { apiGet, apiPatch } from './api';
-import './App.css';
-
-const serviceRegions = [
-  { city: 'Accra', seekers: 3200, providers: 492 },
-  { city: 'Kumasi', seekers: 1910, providers: 281 },
-  { city: 'Takoradi', seekers: 1148, providers: 144 },
-  { city: 'Tema', seekers: 860, providers: 103 },
-];
-
-const supportTickets = [
-  'Refund request for cancelled plumbing job',
-  'Provider wants to update availability calendar',
-  'User flagged suspicious review activity',
-  'Agent follow-up for failed mobile payment',
-];
+import { useEffect, useMemo, useState } from 'react';
+import { apiDelete, apiGet, apiPatch, apiPost } from './api';
+import Sidebar from './components/Sidebar';
+import Topbar from './components/Topbar';
+import OverviewPage from './pages/OverviewPage';
+import UsersPage from './pages/UsersPage';
+import ProvidersPage from './pages/ProvidersPage';
+import BookingsPage from './pages/BookingsPage';
+import ReviewsPage from './pages/ReviewsPage';
+import ReportsPage from './pages/ReportsPage';
+import SettingsPage from './pages/SettingsPage';
+import './styles/admin.css';
 
 function App() {
+  const [activeMenu, setActiveMenu] = useState('overview');
+  const [providerTab, setProviderTab] = useState('pending');
+  const [settingsTab, setSettingsTab] = useState('category');
   const [dashboard, setDashboard] = useState(null);
-  const [approvalQueue, setApprovalQueue] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [providers, setProviders] = useState([]);
+  const [bookings, setBookings] = useState([]);
+  const [reviews, setReviews] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [platformSettings, setPlatformSettings] = useState({ mobile: {}, web: {} });
+  const [categoryForm, setCategoryForm] = useState({ name: '', icon: '' });
   const [statusMessage, setStatusMessage] = useState('Loading admin data...');
 
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        const [dashboardData, providerData] = await Promise.all([
+  const titles = useMemo(
+    () => ({
+      overview: ['Overview', 'Quick metrics and recent records'],
+      users: ['Users', 'All registered users'],
+      providers: ['Providers', 'Pending, approved, and rejected KYC'],
+      bookings: ['Bookings', 'Booking records across the system'],
+      reviews: ['Reviews', 'Ratings and comments'],
+      reports: ['Reports', 'Revenue and platform summary'],
+      settings: ['Settings', 'Manage categories and client settings'],
+    }),
+    []
+  );
+
+  const loadCore = async () => {
+    try {
+      const [dashboardData, userData, bookingData, reviewData, categoryData, mobileData, webData] =
+        await Promise.all([
           apiGet('/dashboard/overview'),
-          apiGet('/services/providers?status=pending'),
+          apiGet('/users'),
+          apiGet('/bookings'),
+          apiGet('/reviews'),
+          apiGet('/categories'),
+          apiGet('/settings/mobile'),
+          apiGet('/settings/web'),
         ]);
 
-        setDashboard(dashboardData);
-        setApprovalQueue(providerData.items);
-        setStatusMessage('Dashboard synced with backend.');
-      } catch (error) {
-        setStatusMessage(error.message);
-      }
-    };
-
-    loadData();
-  }, []);
-
-  const metrics = dashboard
-    ? [
-        {
-          label: 'Total bookings',
-          value: dashboard.totals.bookings,
-          delta: `${dashboard.totals.pendingBookings} pending`,
-        },
-        {
-          label: 'Active providers',
-          value: dashboard.totals.providers,
-          delta: `${dashboard.totals.pendingProviders} awaiting approval`,
-        },
-        {
-          label: 'Available services',
-          value: dashboard.totals.services,
-          delta: `${dashboard.totals.categories} categories`,
-        },
-        {
-          label: 'Platform revenue',
-          value: `$${dashboard.totals.revenueEstimate}`,
-          delta: 'Shared across web and mobile',
-        },
-      ]
-    : [];
-
-  const handleApprove = async (providerId) => {
-    try {
-      await apiPatch(`/providers/${providerId}/status`, { status: 'approved' });
-      setApprovalQueue((current) => current.filter((provider) => (provider.id || provider._id) !== providerId));
-      setDashboard((current) =>
-        current
-          ? {
-              ...current,
-              totals: {
-                ...current.totals,
-                pendingProviders: Math.max(0, current.totals.pendingProviders - 1),
-              },
-            }
-          : current
-      );
-      setStatusMessage('Provider approved successfully.');
+      setDashboard(dashboardData);
+      setUsers(userData.items);
+      setBookings(bookingData.items);
+      setReviews(reviewData.items);
+      setCategories(categoryData.items);
+      setPlatformSettings({ mobile: mobileData.values, web: webData.values });
+      setStatusMessage('Admin synced successfully.');
     } catch (error) {
       setStatusMessage(error.message);
     }
   };
 
+  const loadProviders = async (status) => {
+    try {
+      const providerData = await apiGet(`/services/providers?status=${status}`);
+      setProviders(providerData.items);
+    } catch (error) {
+      setStatusMessage(error.message);
+    }
+  };
+
+  useEffect(() => {
+    loadCore();
+  }, []);
+
+  useEffect(() => {
+    loadProviders(providerTab);
+  }, [providerTab]);
+
+  const handleProviderStatus = async (providerId, status) => {
+    try {
+      await apiPatch(`/providers/${providerId}/status`, { status });
+      await Promise.all([loadProviders(providerTab), loadCore()]);
+      setStatusMessage(`Provider ${status} successfully.`);
+    } catch (error) {
+      setStatusMessage(error.message);
+    }
+  };
+
+  const handleCategoryCreate = async () => {
+    try {
+      await apiPost('/categories', categoryForm);
+      setCategoryForm({ name: '', icon: '' });
+      const categoryData = await apiGet('/categories');
+      setCategories(categoryData.items);
+      setStatusMessage('Category created successfully.');
+    } catch (error) {
+      setStatusMessage(error.message);
+    }
+  };
+
+  const handleCategoryDelete = async (categoryId) => {
+    try {
+      await apiDelete(`/categories/${categoryId}`);
+      const categoryData = await apiGet('/categories');
+      setCategories(categoryData.items);
+      setStatusMessage('Category removed successfully.');
+    } catch (error) {
+      setStatusMessage(error.message);
+    }
+  };
+
+  const handlePlatformChange = (platform, key, value) => {
+    setPlatformSettings((current) => ({
+      ...current,
+      [platform]: {
+        ...current[platform],
+        [key]: value === 'true',
+      },
+    }));
+  };
+
+  const handlePlatformSave = async (platform) => {
+    try {
+      const response = await apiPatch(`/settings/${platform}`, platformSettings[platform]);
+      setStatusMessage(response.message);
+    } catch (error) {
+      setStatusMessage(error.message);
+    }
+  };
+
+  const renderPage = () => {
+    switch (activeMenu) {
+      case 'users':
+        return <UsersPage users={users} />;
+      case 'providers':
+        return (
+          <ProvidersPage
+            activeTab={providerTab}
+            onTabChange={setProviderTab}
+            providers={providers}
+            onStatusChange={handleProviderStatus}
+          />
+        );
+      case 'bookings':
+        return <BookingsPage bookings={bookings} />;
+      case 'reviews':
+        return <ReviewsPage reviews={reviews} />;
+      case 'reports':
+        return <ReportsPage dashboard={dashboard} />;
+      case 'settings':
+        return (
+          <SettingsPage
+            activeTab={settingsTab}
+            onTabChange={setSettingsTab}
+            categories={categories}
+            categoryForm={categoryForm}
+            onCategoryChange={(event) =>
+              setCategoryForm((current) => ({
+                ...current,
+                [event.target.name]: event.target.value,
+              }))
+            }
+            onCategoryCreate={handleCategoryCreate}
+            onCategoryDelete={handleCategoryDelete}
+            platformSettings={platformSettings}
+            onPlatformChange={handlePlatformChange}
+            onPlatformSave={handlePlatformSave}
+          />
+        );
+      case 'overview':
+      default:
+        return <OverviewPage dashboard={dashboard} />;
+    }
+  };
+
+  const [title, subtitle] = titles[activeMenu] || titles.overview;
+
   return (
-    <div className="dashboard-shell">
-      <aside className="sidebar">
-        <div>
-          <p className="eyebrow">Sorted Admin</p>
-          <h1>Operations dashboard</h1>
-          <p className="muted">
-            Manage mobile, web, users, providers, bookings, and support activity from one place.
-          </p>
-        </div>
-
-        <nav className="sidebar-nav">
-          <button className="nav-item active">Overview</button>
-          <button className="nav-item">Users</button>
-          <button className="nav-item">Providers</button>
-          <button className="nav-item">Bookings</button>
-          <button className="nav-item">Reviews</button>
-          <button className="nav-item">Reports</button>
-        </nav>
-
-        <div className="sidebar-card">
-          <p className="eyebrow">Platform sync</p>
-          <strong>All clients share one API</strong>
-          <span>Admin, mobile, and web use the same auth and booking backend.</span>
-        </div>
-      </aside>
-
-      <main className="dashboard-main">
-        <section className="hero">
-          <div>
-            <p className="eyebrow">Daily summary</p>
-            <h2>Keep providers active and service seekers supported.</h2>
-            <p className="muted">
-              Monitor approvals, booking activity, disputes, and regional performance in real time.
-            </p>
-          </div>
-          <div className="hero-actions">
-            <button className="primary-btn">Approve providers</button>
-            <button className="ghost-btn">Export reports</button>
-          </div>
-        </section>
-
-        <section className="metrics-grid">
-          {metrics.map((item) => (
-            <article className="metric-card" key={item.label}>
-              <span>{item.label}</span>
-              <strong>{item.value}</strong>
-              <small>{item.delta}</small>
-            </article>
-          ))}
-        </section>
-
-        <section className="content-grid">
-          <article className="panel">
-            <div className="panel-heading">
-              <div>
-                <p className="eyebrow">Approval queue</p>
-                <h3>New providers</h3>
-              </div>
-              <button className="ghost-btn small">View all</button>
-            </div>
-
-            <div className="stack">
-              {approvalQueue.map((provider) => (
-                <div className="list-row" key={provider.id || provider._id}>
-                  <div>
-                    <strong>{provider.name}</strong>
-                    <p>
-                      {provider.category} • {provider.city}
-                    </p>
-                  </div>
-                  <div className="row-meta">
-                    <span className="pill">{provider.status}</span>
-                    <small>${provider.rate}/hr</small>
-                    <button className="ghost-btn small" onClick={() => handleApprove(provider.id || provider._id)}>
-                      Approve
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </article>
-
-          <article className="panel">
-            <div className="panel-heading">
-              <div>
-                <p className="eyebrow">Regional demand</p>
-                <h3>Where activity is highest</h3>
-              </div>
-            </div>
-
-            <div className="stack">
-              {serviceRegions.map((region) => (
-                <div className="region-card" key={region.city}>
-                  <div>
-                    <strong>{region.city}</strong>
-                    <p>{region.seekers.toLocaleString()} seekers</p>
-                  </div>
-                  <small>{region.providers} providers</small>
-                </div>
-              ))}
-            </div>
-          </article>
-        </section>
-
-        <section className="content-grid">
-          <article className="panel">
-            <div className="panel-heading">
-              <div>
-                <p className="eyebrow">Support desk</p>
-                <h3>Priority tickets</h3>
-              </div>
-            </div>
-
-            <ul className="ticket-list">
-              {supportTickets.map((ticket) => (
-                <li key={ticket}>{ticket}</li>
-              ))}
-            </ul>
-          </article>
-
-          <article className="panel gradient-panel">
-            <p className="eyebrow">Platform health</p>
-            <h3>Unified operations</h3>
-            <p>
-              The starter backend exposes shared auth, provider, service, booking, and dashboard
-              endpoints so all platforms can stay in sync.
-            </p>
-            <div className="status-grid">
-              <div>
-                <span>API</span>
-                <strong>Healthy</strong>
-              </div>
-              <div>
-                <span>Payments</span>
-                <strong>Connected</strong>
-              </div>
-              <div>
-                <span>Reviews</span>
-                <strong>Moderated</strong>
-              </div>
-              <div>
-                <span>Sync</span>
-                <strong>Live</strong>
-              </div>
-            </div>
-          </article>
-        </section>
-
-        <p className="admin-status">{statusMessage}</p>
-      </main>
+    <div className="admin-shell">
+      <Sidebar activeMenu={activeMenu} onChange={setActiveMenu} />
+      <div className="admin-content-shell">
+        <Topbar title={title} subtitle={subtitle} statusMessage={statusMessage} />
+        <main className="admin-content">{renderPage()}</main>
+      </div>
     </div>
   );
 }

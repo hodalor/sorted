@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "mobile",
-    "slug": "mobile",
+    "name": "sorted",
+    "slug": "sorted-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "mobile",
+    "scheme": "sorted",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {

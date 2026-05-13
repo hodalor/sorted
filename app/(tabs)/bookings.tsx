@@ -1,28 +1,38 @@
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
-const conversations = [
-  { name: 'SparkFix Electrical', preview: 'We can arrive by 9:00 AM tomorrow.', time: '2m' },
-  { name: 'Ama Tailoring Studio', preview: 'Your fitting is confirmed for Friday.', time: '1h' },
-  { name: 'Kwame Plumbing', preview: 'Please share the exact leaking point.', time: '3h' },
+const jobs = [
+  {
+    title: 'Electrical rewiring',
+    provider: 'SparkFix Electrical',
+    schedule: 'Tomorrow • 9:00 AM',
+    status: 'Confirmed',
+  },
+  {
+    title: 'Kitchen sink repair',
+    provider: 'Kwame Plumbing',
+    schedule: 'Friday • 2:30 PM',
+    status: 'Pending',
+  },
 ];
 
-export default function MessagesScreen() {
+export default function BookingsScreen() {
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <Text style={styles.eyebrow}>Messages</Text>
-      <Text style={styles.title}>Stay in touch with providers</Text>
+      <Text style={styles.eyebrow}>Bookings</Text>
+      <Text style={styles.title}>Track upcoming jobs</Text>
       <Text style={styles.subtitle}>
-        Confirm arrival times, ask questions, and keep all service conversations in one thread.
+        Review appointment times, provider details, and booking status in one place.
       </Text>
 
       <View style={styles.list}>
-        {conversations.map((item) => (
-          <View key={item.name} style={styles.messageCard}>
+        {jobs.map((job) => (
+          <View key={job.title} style={styles.card}>
             <View style={styles.row}>
-              <Text style={styles.name}>{item.name}</Text>
-              <Text style={styles.time}>{item.time}</Text>
+              <Text style={styles.cardTitle}>{job.title}</Text>
+              <Text style={styles.status}>{job.status}</Text>
             </View>
-            <Text style={styles.preview}>{item.preview}</Text>
+            <Text style={styles.meta}>{job.provider}</Text>
+            <Text style={styles.meta}>{job.schedule}</Text>
           </View>
         ))}
       </View>
@@ -58,7 +68,7 @@ const styles = StyleSheet.create({
   list: {
     gap: 12,
   },
-  messageCard: {
+  card: {
     borderRadius: 22,
     padding: 18,
     backgroundColor: '#111827',
@@ -70,17 +80,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 12,
   },
-  name: {
+  cardTitle: {
     color: '#f8fafc',
-    fontSize: 17,
+    fontSize: 18,
     fontWeight: '600',
+    flex: 1,
   },
-  time: {
-    color: '#94a3b8',
+  status: {
+    color: '#fbbf24',
+    fontWeight: '700',
   },
-  preview: {
+  meta: {
     color: '#cbd5e1',
-    lineHeight: 21,
+    lineHeight: 20,
   },
 });

@@ -1,11 +1,24 @@
 const categories = [
-  { id: 'mechanic', name: 'Mechanic', available: 12 },
-  { id: 'electrician', name: 'Electrician', available: 8 },
-  { id: 'plumber', name: 'Plumber', available: 6 },
-  { id: 'barber', name: 'Barber', available: 20 },
-  { id: 'cleaner', name: 'Cleaner', available: 9 },
-  { id: 'tailor', name: 'Tailor', available: 5 },
+  { id: 'mechanic', name: 'Mechanic', icon: 'wrench', available: 12 },
+  { id: 'electrician', name: 'Electrician', icon: 'bolt', available: 8 },
+  { id: 'plumber', name: 'Plumber', icon: 'droplet', available: 6 },
+  { id: 'barber', name: 'Barber', icon: 'scissors', available: 20 },
+  { id: 'cleaner', name: 'Cleaner', icon: 'sparkles', available: 9 },
+  { id: 'tailor', name: 'Tailor', icon: 'needle', available: 5 },
 ];
+
+const appSettings = {
+  mobile: {
+    allowProviderOnboarding: true,
+    showMessagesTab: true,
+    compactCards: true,
+  },
+  web: {
+    compactMenu: true,
+    stickyBottomMenu: true,
+    showProviderPrompt: true,
+  },
+};
 
 const appUsers = [
   {
@@ -216,4 +229,5 @@ module.exports = {
   bookings,
   appUsers,
   reviews,
+  appSettings,
 };

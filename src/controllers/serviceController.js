@@ -1,13 +1,15 @@
 const { isDbConnected } = require('../config/dbState');
 const { categories, providers, services } = require('../data/mockData');
+const Category = require('../models/Category');
 const Provider = require('../models/Provider');
 const Service = require('../models/Service');
 
 const getCategories = async (_req, res, next) => {
   try {
     if (isDbConnected()) {
+      const categoryDocs = await Category.find().sort({ name: 1 }).lean();
       const providerDocs = await Provider.find({ status: 'approved' }).lean();
-      const categoryItems = categories.map((category) => ({
+      const categoryItems = categoryDocs.map((category) => ({
         ...category,
         available: providerDocs.filter((provider) => provider.category === category.name).length,
       }));

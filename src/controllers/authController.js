@@ -3,11 +3,14 @@ const jwt = require('jsonwebtoken');
 const { validationResult } = require('express-validator');
 
 const { isDbConnected } = require('../config/dbState');
+const { verifyFirebaseIdToken } = require('../config/firebaseAdmin');
 const { appUsers, providers } = require('../data/mockData');
 const Provider = require('../models/Provider');
 const User = require('../models/User');
 
 const otpStore = new Map();
+
+const normalizePhoneNumber = (value = '') => value.replace(/[^\d+]/g, '');
 
 const buildToken = (user) =>
   jwt.sign(
@@ -95,6 +98,10 @@ const requestOtp = async (req, res, next) => {
       otpCode,
     });
   } catch (error) {
+    if (error instanceof Error && error.message.includes('Firebase Admin credentials are missing')) {
+      return res.status(503).json({ message: error.message });
+    }
+
     return next(error);
   }
 };
@@ -126,6 +133,39 @@ const verifyOtp = async (req, res, next) => {
     return res.json({
       message: 'Phone number verified successfully.',
       verificationToken: buildVerificationToken(phoneNumber),
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+const verifyFirebasePhone = async (req, res, next) => {
+  try {
+    const errors = validationResult(req);
+
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { idToken, phoneNumber = '' } = req.body;
+    const decoded = await verifyFirebaseIdToken(idToken);
+    const verifiedPhoneNumber = decoded.phone_number || '';
+
+    if (!verifiedPhoneNumber) {
+      return res.status(400).json({ message: 'The Firebase token does not include a verified phone number.' });
+    }
+
+    if (
+      normalizePhoneNumber(phoneNumber) &&
+      normalizePhoneNumber(phoneNumber) !== normalizePhoneNumber(verifiedPhoneNumber)
+    ) {
+      return res.status(400).json({ message: 'The verified phone number does not match the submitted number.' });
+    }
+
+    return res.json({
+      message: 'Phone number verified successfully.',
+      phoneNumber: verifiedPhoneNumber,
+      verificationToken: buildVerificationToken(verifiedPhoneNumber),
     });
   } catch (error) {
     return next(error);
@@ -247,6 +287,7 @@ const login = async (req, res, next) => {
 module.exports = {
   requestOtp,
   verifyOtp,
+  verifyFirebasePhone,
   completeSignup,
   login,
 };

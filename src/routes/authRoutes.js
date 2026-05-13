@@ -1,7 +1,13 @@
 const express = require('express');
 const { body } = require('express-validator');
 
-const { completeSignup, login, requestOtp, verifyOtp } = require('../controllers/authController');
+const {
+  completeSignup,
+  login,
+  requestOtp,
+  verifyFirebasePhone,
+  verifyOtp,
+} = require('../controllers/authController');
 
 const router = express.Router();
 
@@ -27,6 +33,19 @@ router.post(
     body('otpCode').trim().isLength({ min: 4, max: 4 }).withMessage('otpCode must be 4 digits.'),
   ],
   verifyOtp
+);
+
+router.post(
+  '/verify-firebase-phone',
+  [
+    body('idToken').trim().notEmpty().withMessage('idToken is required.'),
+    body('phoneNumber')
+      .optional({ values: 'falsy' })
+      .trim()
+      .isLength({ min: 10 })
+      .withMessage('A valid phone number is required.'),
+  ],
+  verifyFirebasePhone
 );
 
 router.post(

@@ -27,26 +27,22 @@ const getFirebaseApp = () => {
 };
 
 let recaptchaVerifierInstance = null;
-let recaptchaContainerId = '';
 
 const getFirebaseAuthClient = () => getAuth(getFirebaseApp());
 
-export const createPhoneRecaptchaVerifier = (containerId) => {
-  if (recaptchaVerifierInstance && recaptchaContainerId === containerId) {
-    return recaptchaVerifierInstance;
-  }
-
+export const createPhoneRecaptchaVerifier = (containerId, options = {}) => {
   const auth = getFirebaseAuthClient();
-  recaptchaContainerId = containerId;
   recaptchaVerifierInstance = new RecaptchaVerifier(auth, containerId, {
     size: 'normal',
+    ...options,
   });
 
   return recaptchaVerifierInstance;
 };
 
-export const renderPhoneRecaptcha = async (containerId) => {
-  const verifier = createPhoneRecaptchaVerifier(containerId);
+export const renderPhoneRecaptcha = async (containerId, options = {}) => {
+  resetPhoneRecaptcha();
+  const verifier = createPhoneRecaptchaVerifier(containerId, options);
   await verifier.render();
   return verifier;
 };
@@ -71,7 +67,6 @@ export const resetPhoneRecaptcha = () => {
   if (recaptchaVerifierInstance) {
     recaptchaVerifierInstance.clear();
     recaptchaVerifierInstance = null;
-    recaptchaContainerId = '';
   }
 };
 

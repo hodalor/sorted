@@ -1,9 +1,11 @@
 function AuthPage({
   authStep,
   countryOptions,
+  otpProvider,
   loginForm,
   signupForm,
   authLoading,
+  showRecaptcha,
   statusMessage,
   onLoginChange,
   onSignupChange,
@@ -60,7 +62,11 @@ function AuthPage({
 
       {authStep === 'signup-phone' ? (
         <div className="auth-card">
-          <p className="auth-hint">Firebase will text a verification code to this number.</p>
+          <p className="auth-hint">
+            {otpProvider === 'system'
+              ? 'Request OTP to generate a system code and verify it before entering your profile details.'
+              : 'Request OTP to load reCAPTCHA, then complete it to receive the Firebase SMS code.'}
+          </p>
           <div className="phone-input-row">
             <select name="countryCode" value={signupForm.countryCode} onChange={onSignupChange}>
               {countryOptions.map((country) => (
@@ -77,9 +83,15 @@ function AuthPage({
               onChange={onSignupChange}
             />
           </div>
-          <div id="firebase-recaptcha" className="firebase-recaptcha" />
+          {otpProvider === 'firebase' && showRecaptcha ? (
+            <div id="firebase-recaptcha" className="firebase-recaptcha" />
+          ) : null}
           <button className="primary-btn full" onClick={onRequestOtp} disabled={authLoading.requestOtp}>
-            {authLoading.requestOtp ? 'Requesting OTP...' : 'Request OTP'}
+            {authLoading.requestOtp
+              ? otpProvider === 'firebase'
+                ? 'Waiting for reCAPTCHA...'
+                : 'Generating OTP...'
+              : 'Request OTP'}
           </button>
           <button className="text-btn" onClick={() => onStepChange('login')}>
             Back to login
@@ -89,7 +101,11 @@ function AuthPage({
 
       {authStep === 'signup-otp' ? (
         <div className="auth-card">
-          <p className="auth-hint">Enter the SMS code sent by Firebase.</p>
+          <p className="auth-hint">
+            {otpProvider === 'system'
+              ? 'Enter the system-generated OTP shown on the screen.'
+              : 'Enter the SMS code sent by Firebase.'}
+          </p>
           <input
             name="otpCode"
             type="text"

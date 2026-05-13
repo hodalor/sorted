@@ -49,6 +49,7 @@ const defaultCountryOptions = [
 ];
 
 function App() {
+  const defaultOtpProvider = 'firebase';
   const [authStep, setAuthStep] = useState('login');
   const [activeMenu, setActiveMenu] = useState('home');
   const [loginForm, setLoginForm] = useState({
@@ -58,6 +59,7 @@ function App() {
   });
   const [signupForm, setSignupForm] = useState(signupDefaults);
   const [countryOptions, setCountryOptions] = useState(defaultCountryOptions);
+  const [authSettings, setAuthSettings] = useState({ otpProvider: defaultOtpProvider });
   const [authLoading, setAuthLoading] = useState({
     login: false,
     requestOtp: false,
@@ -78,8 +80,10 @@ function App() {
     serviceTitle: '',
   });
   const [statusMessage, setStatusMessage] = useState('Use phone number and 4-digit PIN to continue.');
+  const [showRecaptcha, setShowRecaptcha] = useState(false);
   const recaptchaVerifierRef = useRef(null);
   const phoneConfirmationRef = useRef(null);
+  const pendingFirebasePhoneRef = useRef('');
   const formatPhoneNumber = (countryCode, value) => {
     const trimmedValue = value.trim();
 
@@ -152,16 +156,19 @@ function App() {
   }, [session]);
 
   useEffect(() => {
-    const loadCountries = async () => {
+    const loadAuthSetup = async () => {
       try {
-        const response = await apiGet('/countries');
-        const enabledCountries = (response.items || []).filter((item) => item.enabled !== false);
+        const [countryResponse, settingsResponse] = await Promise.all([apiGet('/countries'), apiGet('/settings/web')]);
+        const enabledCountries = (countryResponse.items || []).filter((item) => item.enabled !== false);
+        const otpProvider = settingsResponse?.values?.otpProvider || defaultOtpProvider;
 
         if (!enabledCountries.length) {
+          setAuthSettings({ otpProvider });
           return;
         }
 
         setCountryOptions(enabledCountries);
+        setAuthSettings({ otpProvider });
         setLoginForm((current) => ({
           ...current,
           countryCode: enabledCountries.some((item) => item.dialingCode === current.countryCode)
@@ -179,32 +186,78 @@ function App() {
       }
     };
 
-    loadCountries();
+    loadAuthSetup();
   }, []);
 
   useEffect(() => {
-    if (authStep !== 'signup-phone') {
+    if (authStep !== 'signup-phone' || !showRecaptcha || authSettings.otpProvider !== 'firebase') {
       return undefined;
     }
 
     let isMounted = true;
 
-    const preloadRecaptcha = async () => {
+    const renderAndWaitForVerification = async () => {
       try {
-        await renderPhoneRecaptcha('firebase-recaptcha');
+        const verifier = await renderPhoneRecaptcha('firebase-recaptcha', {
+          callback: async () => {
+            try {
+              phoneConfirmationRef.current = await sendPhoneVerificationCode(
+                pendingFirebasePhoneRef.current,
+                recaptchaVerifierRef.current
+              );
+
+              if (!isMounted) {
+                return;
+              }
+
+              setSignupForm((current) => ({
+                ...current,
+                phoneNumber: pendingFirebasePhoneRef.current,
+                otpToken: '',
+              }));
+              setAuthStep('signup-otp');
+              setShowRecaptcha(false);
+              setStatusMessage('Verification code sent to your phone.');
+            } catch (error) {
+              if (isMounted) {
+                setStatusMessage(getFirebasePhoneErrorMessage(error));
+                setShowRecaptcha(false);
+              }
+            } finally {
+              if (isMounted) {
+                setAuthLoading((current) => ({ ...current, requestOtp: false }));
+                recaptchaVerifierRef.current = null;
+                resetPhoneRecaptcha();
+              }
+            }
+          },
+          'expired-callback': () => {
+            if (isMounted) {
+              setStatusMessage('reCAPTCHA expired. Click Request OTP again.');
+              setShowRecaptcha(false);
+              setAuthLoading((current) => ({ ...current, requestOtp: false }));
+              recaptchaVerifierRef.current = null;
+              resetPhoneRecaptcha();
+            }
+          },
+        });
+
+        recaptchaVerifierRef.current = verifier;
       } catch (error) {
         if (isMounted) {
           setStatusMessage(getFirebasePhoneErrorMessage(error));
+          setShowRecaptcha(false);
+          setAuthLoading((current) => ({ ...current, requestOtp: false }));
         }
       }
     };
 
-    preloadRecaptcha();
+    renderAndWaitForVerification();
 
     return () => {
       isMounted = false;
     };
-  }, [authStep]);
+  }, [authSettings.otpProvider, authStep, showRecaptcha]);
 
   const handleLoginChange = (event) => {
     const { name, value } = event.target;
@@ -256,19 +309,44 @@ function App() {
   };
 
   const handleRequestOtp = async () => {
+    const fullPhoneNumber = formatPhoneNumber(signupForm.countryCode, signupForm.phoneNumber);
+
+    if (!fullPhoneNumber || fullPhoneNumber.length < 10) {
+      setStatusMessage('Enter a valid phone number first.');
+      return;
+    }
+
     try {
       setAuthLoading((current) => ({ ...current, requestOtp: true }));
-      const fullPhoneNumber = formatPhoneNumber(signupForm.countryCode, signupForm.phoneNumber);
-      const recaptchaVerifier =
-        recaptchaVerifierRef.current || (await renderPhoneRecaptcha('firebase-recaptcha'));
+      setSignupForm((current) => ({
+        ...current,
+        phoneNumber: fullPhoneNumber,
+      }));
 
-      recaptchaVerifierRef.current = recaptchaVerifier;
-      phoneConfirmationRef.current = await sendPhoneVerificationCode(fullPhoneNumber, recaptchaVerifier);
-      setAuthStep('signup-otp');
-      setStatusMessage('Verification code sent to your phone.');
+      if (authSettings.otpProvider === 'system') {
+        const response = await apiPost('/auth/request-otp', {
+          phoneNumber: fullPhoneNumber,
+        });
+
+        setSignupForm((current) => ({
+          ...current,
+          phoneNumber: fullPhoneNumber,
+          otpToken: response.otpToken,
+        }));
+        setAuthStep('signup-otp');
+        setStatusMessage(`System OTP: ${response.otpCode}`);
+        setAuthLoading((current) => ({ ...current, requestOtp: false }));
+        return;
+      }
+
+      pendingFirebasePhoneRef.current = fullPhoneNumber;
+      phoneConfirmationRef.current = null;
+      recaptchaVerifierRef.current = null;
+      resetPhoneRecaptcha();
+      setShowRecaptcha(true);
+      setStatusMessage('Complete the reCAPTCHA below to send the OTP.');
     } catch (error) {
       setStatusMessage(getFirebasePhoneErrorMessage(error));
-    } finally {
       setAuthLoading((current) => ({ ...current, requestOtp: false }));
     }
   };
@@ -276,21 +354,32 @@ function App() {
   const handleVerifyOtp = async () => {
     try {
       setAuthLoading((current) => ({ ...current, verifyOtp: true }));
-      if (!phoneConfirmationRef.current) {
-        setStatusMessage('Request a verification code first.');
-        return;
-      }
-
       const fullPhoneNumber = formatPhoneNumber(signupForm.countryCode, signupForm.phoneNumber);
-      const idToken = await confirmPhoneVerificationCode(phoneConfirmationRef.current, signupForm.otpCode);
-      const response = await apiPost('/auth/verify-firebase-phone', {
-        idToken,
-        phoneNumber: fullPhoneNumber,
-      });
+
+      let response;
+
+      if (authSettings.otpProvider === 'system') {
+        response = await apiPost('/auth/verify-otp', {
+          phoneNumber: fullPhoneNumber,
+          otpToken: signupForm.otpToken,
+          otpCode: signupForm.otpCode,
+        });
+      } else {
+        if (!phoneConfirmationRef.current) {
+          setStatusMessage('Request a verification code first.');
+          return;
+        }
+
+        const idToken = await confirmPhoneVerificationCode(phoneConfirmationRef.current, signupForm.otpCode);
+        response = await apiPost('/auth/verify-firebase-phone', {
+          idToken,
+          phoneNumber: fullPhoneNumber,
+        });
+      }
 
       setSignupForm((current) => ({
         ...current,
-        phoneNumber: response.phoneNumber,
+        phoneNumber: response.phoneNumber || fullPhoneNumber,
         verificationToken: response.verificationToken,
       }));
       setAuthStep('signup-profile');
@@ -319,6 +408,7 @@ function App() {
       setAuthStep('portal');
       phoneConfirmationRef.current = null;
       recaptchaVerifierRef.current = null;
+      setShowRecaptcha(false);
       resetPhoneRecaptcha();
       await clearFirebaseWebSession();
     } catch (error) {
@@ -461,9 +551,11 @@ function App() {
           <AuthPage
             authStep={authStep}
             countryOptions={countryOptions}
+            otpProvider={authSettings.otpProvider}
             loginForm={loginForm}
             signupForm={signupForm}
             authLoading={authLoading}
+            showRecaptcha={showRecaptcha}
             statusMessage={statusMessage}
             onLoginChange={handleLoginChange}
             onSignupChange={handleSignupChange}
@@ -475,6 +567,8 @@ function App() {
               if (nextStep === 'login') {
                 phoneConfirmationRef.current = null;
                 recaptchaVerifierRef.current = null;
+                setShowRecaptcha(false);
+                setAuthLoading((current) => ({ ...current, requestOtp: false }));
                 resetPhoneRecaptcha();
               }
 

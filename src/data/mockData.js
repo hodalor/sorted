@@ -15,7 +15,11 @@ const providers = [
     city: 'Accra',
     rate: 40,
     rating: 4.8,
-    reviews: 124,
+    reviewsCount: 124,
+    status: 'approved',
+    bio: 'Reliable residential and commercial plumbing support with fast response times.',
+    completedJobs: 184,
+    responseTime: '15 mins',
     availability: ['Mon 09:00', 'Tue 14:00', 'Thu 10:00'],
   },
   {
@@ -25,7 +29,11 @@ const providers = [
     city: 'Kumasi',
     rate: 52,
     rating: 4.9,
-    reviews: 91,
+    reviewsCount: 91,
+    status: 'pending',
+    bio: 'Certified electrical troubleshooting, rewiring, and installation services.',
+    completedJobs: 132,
+    responseTime: '20 mins',
     availability: ['Wed 11:30', 'Fri 16:00', 'Sat 09:00'],
   },
   {
@@ -35,7 +43,11 @@ const providers = [
     city: 'Accra',
     rate: 22,
     rating: 4.7,
-    reviews: 78,
+    reviewsCount: 78,
+    status: 'approved',
+    bio: 'Home and office cleaning with flexible daily schedules.',
+    completedJobs: 203,
+    responseTime: '10 mins',
     availability: ['Daily 08:00', 'Daily 13:00'],
   },
   {
@@ -45,7 +57,11 @@ const providers = [
     city: 'Tema',
     rate: 45,
     rating: 4.9,
-    reviews: 141,
+    reviewsCount: 141,
+    status: 'approved',
+    bio: 'Trusted mechanic for diagnostics, maintenance, and roadside support.',
+    completedJobs: 249,
+    responseTime: '18 mins',
     availability: ['Mon 10:00', 'Thu 15:00', 'Sat 12:00'],
   },
 ];
@@ -59,6 +75,7 @@ const services = providers.map((provider) => ({
   city: provider.city,
   rate: provider.rate,
   rating: provider.rating,
+  description: provider.bio,
 }));
 
 const bookings = [
@@ -66,19 +83,27 @@ const bookings = [
     id: 'book-001',
     serviceId: 'svc-prov-002',
     providerId: 'prov-002',
+    providerName: 'SparkFix Electrical',
+    serviceTitle: 'Electrician service',
     seekerName: 'Kojo Mensah',
+    seekerEmail: 'seeker@sorted.app',
     date: '2026-05-15',
     time: '09:00',
     status: 'confirmed',
+    price: 52,
   },
   {
     id: 'book-002',
     serviceId: 'svc-prov-001',
     providerId: 'prov-001',
+    providerName: 'Kwame Plumbing',
+    serviceTitle: 'Plumber service',
     seekerName: 'Efua Anane',
+    seekerEmail: 'efua@sorted.app',
     date: '2026-05-16',
     time: '14:30',
     status: 'pending',
+    price: 40,
   },
 ];
 
@@ -101,10 +126,38 @@ const appUsers = [
   },
 ];
 
+const reviews = [
+  {
+    id: 'rev-001',
+    providerId: 'prov-001',
+    authorName: 'Mabel A.',
+    rating: 5,
+    comment: 'Fixed the issue quickly and explained everything clearly.',
+    createdAt: '2026-05-01T10:00:00.000Z',
+  },
+  {
+    id: 'rev-002',
+    providerId: 'prov-003',
+    authorName: 'Kofi B.',
+    rating: 4,
+    comment: 'Arrived on time and left the apartment spotless.',
+    createdAt: '2026-05-03T13:15:00.000Z',
+  },
+  {
+    id: 'rev-003',
+    providerId: 'prov-004',
+    authorName: 'Abena Y.',
+    rating: 5,
+    comment: 'Very professional and solved the breakdown same day.',
+    createdAt: '2026-05-07T08:45:00.000Z',
+  },
+];
+
 module.exports = {
   categories,
   providers,
   services,
   bookings,
   appUsers,
+  reviews,
 };

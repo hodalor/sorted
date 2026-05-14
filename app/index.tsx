@@ -35,6 +35,7 @@ export default function AuthScreen() {
   const [signupForm, setSignupForm] = useState(signupDefaults);
   const [message, setMessage] = useState('Login with phone number and 4-digit PIN.');
   const phoneConfirmationRef = useRef<FirebaseAuthTypes.ConfirmationResult | null>(null);
+  const otpLength = otpProvider === 'firebase' ? 6 : 4;
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -222,10 +223,11 @@ export default function AuthScreen() {
               value={signupForm.otpCode}
               onChangeText={(otpCode) => setSignupForm((current) => ({ ...current, otpCode }))}
               style={styles.input}
-              placeholder="Enter OTP"
+              placeholder={`Enter ${otpLength}-digit OTP`}
               placeholderTextColor="#64748b"
               keyboardType="number-pad"
-              maxLength={4}
+              maxLength={otpLength}
+              autoComplete="sms-otp"
             />
             <TouchableOpacity style={styles.primaryButton} onPress={handleVerifyOtp}>
               <Text style={styles.primaryButtonText}>Verify phone</Text>

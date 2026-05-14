@@ -590,11 +590,17 @@ function App() {
             onVerifyOtp={handleVerifyOtp}
             onCompleteSignup={handleCompleteSignup}
             onStepChange={(nextStep) => {
-              if (nextStep === 'login') {
+              if (nextStep === 'login' || nextStep === 'signup-phone') {
                 phoneConfirmationRef.current = null;
                 recaptchaVerifierRef.current = null;
                 setShowRecaptcha(false);
                 setAuthLoading((current) => ({ ...current, requestOtp: false }));
+                setSignupForm((current) => ({
+                  ...current,
+                  otpCode: '',
+                  otpToken: '',
+                  verificationToken: '',
+                }));
                 resetPhoneRecaptcha();
               }
 

@@ -109,6 +109,9 @@ function AuthPage({
               ? 'Enter the system-generated OTP shown on the screen.'
               : 'Enter the SMS code sent by Firebase.'}
           </p>
+          <button className="text-btn inline-back" onClick={() => onStepChange('signup-phone')}>
+            Back
+          </button>
           <input
             name="otpCode"
             type="text"

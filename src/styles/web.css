@@ -246,6 +246,12 @@ h3 {
   color: #93c5fd;
 }
 
+.text-btn.inline-back {
+  width: fit-content;
+  padding: 0;
+  font-weight: 600;
+}
+
 .ghost-btn.small {
   padding: 8px 12px;
   border-radius: 999px;

@@ -16,6 +16,8 @@ function AuthPage({
   onCompleteSignup,
   onStepChange,
 }) {
+  const otpLength = otpProvider === 'firebase' ? 6 : 4;
+
   return (
     <section className="auth-screen">
       <p className="eyebrow">Sorted</p>
@@ -111,8 +113,9 @@ function AuthPage({
             name="otpCode"
             type="text"
             inputMode="numeric"
-            maxLength="4"
-            placeholder="Enter OTP"
+            autoComplete="one-time-code"
+            maxLength={otpLength}
+            placeholder={`Enter ${otpLength}-digit OTP`}
             value={signupForm.otpCode}
             onChange={onSignupChange}
           />

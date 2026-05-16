@@ -1,6 +1,7 @@
 import { providerTabs } from '../constants/menuItems';
+import LoadingDots from '../components/LoadingDots';
 
-function ProvidersPage({ activeTab, onTabChange, providers, onStatusChange }) {
+function ProvidersPage({ activeTab, onTabChange, providers, actionLoading, onStatusChange }) {
   return (
     <section className="panel">
       <div className="panel-heading">
@@ -22,29 +23,58 @@ function ProvidersPage({ activeTab, onTabChange, providers, onStatusChange }) {
       </div>
 
       <div className="panel-list">
-        {providers.map((provider) => {
-          const providerId = provider._id || provider.id;
-          return (
-            <div className="provider-row" key={providerId}>
-              <div>
-                <strong>{provider.businessName || provider.name}</strong>
-                <p>
-                  {provider.category} • {provider.city}
-                </p>
-                <small>{provider.registrationNumber || 'Not registered business'}</small>
+        {providers.length ? (
+          providers.map((provider) => {
+            const providerId = provider._id || provider.id;
+            const approving = actionLoading.providerStatus === `${providerId}-approved`;
+            const rejecting = actionLoading.providerStatus === `${providerId}-rejected`;
+
+            return (
+              <div className="provider-row" key={providerId}>
+                <div>
+                  <strong>{provider.businessName || provider.name}</strong>
+                  <p>
+                    {provider.category} • {provider.city}
+                  </p>
+                  <small>{provider.registrationNumber || 'Not registered business'}</small>
+                </div>
+                <div className="provider-actions">
+                  <span className={`pill ${provider.status}`}>{provider.status}</span>
+                  <button
+                    className="ghost-btn small"
+                    onClick={() => onStatusChange(providerId, 'approved')}
+                    disabled={approving || rejecting}>
+                    {approving ? (
+                      <span className="button-content">
+                        <LoadingDots />
+                        <span>Approving</span>
+                      </span>
+                    ) : (
+                      'Approve'
+                    )}
+                  </button>
+                  <button
+                    className="ghost-btn small"
+                    onClick={() => onStatusChange(providerId, 'rejected')}
+                    disabled={approving || rejecting}>
+                    {rejecting ? (
+                      <span className="button-content">
+                        <LoadingDots />
+                        <span>Rejecting</span>
+                      </span>
+                    ) : (
+                      'Reject'
+                    )}
+                  </button>
+                </div>
               </div>
-              <div className="provider-actions">
-                <span className={`pill ${provider.status}`}>{provider.status}</span>
-                <button className="ghost-btn small" onClick={() => onStatusChange(providerId, 'approved')}>
-                  Approve
-                </button>
-                <button className="ghost-btn small" onClick={() => onStatusChange(providerId, 'rejected')}>
-                  Reject
-                </button>
-              </div>
-            </div>
-          );
-        })}
+            );
+          })
+        ) : (
+          <div className="list-row">
+            <p>No providers in this status yet.</p>
+          </div>
+        )}
       </div>
     </section>
   );

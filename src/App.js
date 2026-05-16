@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiDelete, apiGet, apiPatch, apiPost } from './api';
 import Sidebar from './components/Sidebar';
+import LoadingDots from './components/LoadingDots';
 import Topbar from './components/Topbar';
+import Toast from './components/Toast';
 import OverviewPage from './pages/OverviewPage';
 import UsersPage from './pages/UsersPage';
 import ProvidersPage from './pages/ProvidersPage';
@@ -31,6 +33,33 @@ function App() {
     currencySymbol: '',
   });
   const [statusMessage, setStatusMessage] = useState('Loading admin data...');
+  const [toast, setToast] = useState(null);
+  const [actionLoading, setActionLoading] = useState({
+    providerStatus: '',
+    categoryCreate: false,
+    categoryDelete: '',
+    countryCreate: false,
+    countryDelete: '',
+    platformSave: '',
+  });
+
+  const showToast = (type, message, title) => {
+    setStatusMessage(message);
+    setToast({
+      id: Date.now(),
+      type,
+      title:
+        title ||
+        {
+          success: 'Success',
+          error: 'Error',
+          warning: 'Warning',
+          info: 'Notice',
+        }[type] ||
+        'Notice',
+      message,
+    });
+  };
 
   const titles = useMemo(
     () => ({
@@ -45,7 +74,7 @@ function App() {
     []
   );
 
-  const loadCore = async () => {
+  const loadCore = useCallback(async () => {
     try {
       const [dashboardData, userData, bookingData, reviewData, categoryData, countryData, generalData, mobileData, webData] =
         await Promise.all([
@@ -69,80 +98,137 @@ function App() {
       setPlatformSettings({ general: generalData.values, mobile: mobileData.values, web: webData.values });
       setStatusMessage('Admin synced successfully.');
     } catch (error) {
-      setStatusMessage(error.message);
+      showToast('error', error.message);
     }
-  };
+  }, []);
 
-  const loadProviders = async (status) => {
+  const loadProviders = useCallback(async (status) => {
     try {
       const providerData = await apiGet(`/services/providers?status=${status}`);
       setProviders(providerData.items);
     } catch (error) {
-      setStatusMessage(error.message);
+      showToast('error', error.message);
     }
-  };
-
-  useEffect(() => {
-    loadCore();
   }, []);
 
   useEffect(() => {
+    loadCore();
+  }, [loadCore]);
+
+  useEffect(() => {
     loadProviders(providerTab);
-  }, [providerTab]);
+  }, [loadProviders, providerTab]);
+
+  useEffect(() => {
+    if (!toast) {
+      return undefined;
+    }
+
+    const timer = window.setTimeout(() => {
+      setToast(null);
+    }, 4200);
+
+    return () => window.clearTimeout(timer);
+  }, [toast]);
 
   const handleProviderStatus = async (providerId, status) => {
     try {
+      setActionLoading((current) => ({
+        ...current,
+        providerStatus: `${providerId}-${status}`,
+      }));
       await apiPatch(`/providers/${providerId}/status`, { status });
       await Promise.all([loadProviders(providerTab), loadCore()]);
-      setStatusMessage(`Provider ${status} successfully.`);
+      showToast('success', `Provider ${status} successfully.`);
     } catch (error) {
-      setStatusMessage(error.message);
+      showToast('error', error.message);
+    } finally {
+      setActionLoading((current) => ({
+        ...current,
+        providerStatus: '',
+      }));
     }
   };
 
   const handleCategoryCreate = async () => {
     try {
+      setActionLoading((current) => ({
+        ...current,
+        categoryCreate: true,
+      }));
       await apiPost('/categories', categoryForm);
       setCategoryForm({ name: '', icon: '' });
       const categoryData = await apiGet('/categories');
       setCategories(categoryData.items);
-      setStatusMessage('Category created successfully.');
+      showToast('success', 'Category created successfully.');
     } catch (error) {
-      setStatusMessage(error.message);
+      showToast('error', error.message);
+    } finally {
+      setActionLoading((current) => ({
+        ...current,
+        categoryCreate: false,
+      }));
     }
   };
 
   const handleCategoryDelete = async (categoryId) => {
     try {
+      setActionLoading((current) => ({
+        ...current,
+        categoryDelete: categoryId,
+      }));
       await apiDelete(`/categories/${categoryId}`);
       const categoryData = await apiGet('/categories');
       setCategories(categoryData.items);
-      setStatusMessage('Category removed successfully.');
+      showToast('success', 'Category removed successfully.');
     } catch (error) {
-      setStatusMessage(error.message);
+      showToast('error', error.message);
+    } finally {
+      setActionLoading((current) => ({
+        ...current,
+        categoryDelete: '',
+      }));
     }
   };
 
   const handleCountryCreate = async () => {
     try {
+      setActionLoading((current) => ({
+        ...current,
+        countryCreate: true,
+      }));
       await apiPost('/countries', countryForm);
       setCountryForm({ name: '', code: '', dialingCode: '', currencySymbol: '' });
       const countryData = await apiGet('/countries');
       setCountries(countryData.items);
-      setStatusMessage('Country created successfully.');
+      showToast('success', 'Country created successfully.');
     } catch (error) {
-      setStatusMessage(error.message);
+      showToast('error', error.message);
+    } finally {
+      setActionLoading((current) => ({
+        ...current,
+        countryCreate: false,
+      }));
     }
   };
 
   const handleCountryDelete = async (countryId) => {
     try {
+      setActionLoading((current) => ({
+        ...current,
+        countryDelete: countryId,
+      }));
       await apiDelete(`/countries/${countryId}`);
       const countryData = await apiGet('/countries');
       setCountries(countryData.items);
-      setStatusMessage('Country removed successfully.');
+      showToast('success', 'Country removed successfully.');
     } catch (error) {
-      setStatusMessage(error.message);
+      showToast('error', error.message);
+    } finally {
+      setActionLoading((current) => ({
+        ...current,
+        countryDelete: '',
+      }));
     }
   };
 
@@ -158,10 +244,19 @@ function App() {
 
   const handlePlatformSave = async (platform) => {
     try {
+      setActionLoading((current) => ({
+        ...current,
+        platformSave: platform,
+      }));
       const response = await apiPatch(`/settings/${platform}`, platformSettings[platform]);
-      setStatusMessage(response.message);
+      showToast('success', response.message);
     } catch (error) {
-      setStatusMessage(error.message);
+      showToast('error', error.message);
+    } finally {
+      setActionLoading((current) => ({
+        ...current,
+        platformSave: '',
+      }));
     }
   };
 
@@ -175,6 +270,7 @@ function App() {
             activeTab={providerTab}
             onTabChange={setProviderTab}
             providers={providers}
+            actionLoading={actionLoading}
             onStatusChange={handleProviderStatus}
           />
         );
@@ -201,6 +297,7 @@ function App() {
             onCategoryDelete={handleCategoryDelete}
             countries={countries}
             countryForm={countryForm}
+            actionLoading={actionLoading}
             onCountryChange={(event) =>
               setCountryForm((current) => ({
                 ...current,
@@ -226,8 +323,18 @@ function App() {
     <div className="admin-shell">
       <Sidebar activeMenu={activeMenu} onChange={setActiveMenu} />
       <div className="admin-content-shell">
+        <Toast toast={toast} onClose={() => setToast(null)} />
         <Topbar title={title} subtitle={subtitle} statusMessage={statusMessage} />
-        <main className="admin-content">{renderPage()}</main>
+        <main className="admin-content">
+          {!dashboard && activeMenu === 'overview' ? (
+            <div className="panel loading-panel">
+              <LoadingDots />
+              <p className="panel-copy">Loading admin data</p>
+            </div>
+          ) : (
+            renderPage()
+          )}
+        </main>
       </div>
     </div>
   );

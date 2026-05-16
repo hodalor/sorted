@@ -1,4 +1,5 @@
 import { settingsTabs } from '../constants/menuItems';
+import LoadingDots from '../components/LoadingDots';
 
 function SettingsPage({
   activeTab,
@@ -10,6 +11,7 @@ function SettingsPage({
   onCategoryDelete,
   countries,
   countryForm,
+  actionLoading,
   onCountryChange,
   onCountryCreate,
   onCountryDelete,
@@ -49,7 +51,14 @@ function SettingsPage({
             </select>
           </label>
           <button className="primary-btn" onClick={() => onPlatformSave('general')}>
-            Save General Settings
+            {actionLoading.platformSave === 'general' ? (
+              <span className="button-content">
+                <LoadingDots />
+                <span>Saving General</span>
+              </span>
+            ) : (
+              'Save General Settings'
+            )}
           </button>
         </div>
       ) : null}
@@ -69,8 +78,15 @@ function SettingsPage({
               onChange={onCategoryChange}
               placeholder="Icon name"
             />
-            <button className="primary-btn" onClick={onCategoryCreate}>
-              Create Category
+            <button className="primary-btn" onClick={onCategoryCreate} disabled={actionLoading.categoryCreate}>
+              {actionLoading.categoryCreate ? (
+                <span className="button-content">
+                  <LoadingDots />
+                  <span>Creating Category</span>
+                </span>
+              ) : (
+                'Create Category'
+              )}
             </button>
           </div>
 
@@ -81,8 +97,18 @@ function SettingsPage({
                   <strong>{category.name}</strong>
                   <p>{category.icon || 'No icon'}</p>
                 </div>
-                <button className="ghost-btn small" onClick={() => onCategoryDelete(category._id || category.id)}>
-                  Remove
+                <button
+                  className="ghost-btn small"
+                  onClick={() => onCategoryDelete(category._id || category.id)}
+                  disabled={actionLoading.categoryDelete === (category._id || category.id)}>
+                  {actionLoading.categoryDelete === (category._id || category.id) ? (
+                    <span className="button-content">
+                      <LoadingDots />
+                      <span>Removing</span>
+                    </span>
+                  ) : (
+                    'Remove'
+                  )}
                 </button>
               </div>
             ))}
@@ -117,8 +143,15 @@ function SettingsPage({
               onChange={onCountryChange}
               placeholder="Currency symbol e.g. GHS"
             />
-            <button className="primary-btn" onClick={onCountryCreate}>
-              Create Country
+            <button className="primary-btn" onClick={onCountryCreate} disabled={actionLoading.countryCreate}>
+              {actionLoading.countryCreate ? (
+                <span className="button-content">
+                  <LoadingDots />
+                  <span>Creating Country</span>
+                </span>
+              ) : (
+                'Create Country'
+              )}
             </button>
           </div>
 
@@ -131,8 +164,18 @@ function SettingsPage({
                     {country.dialingCode} · {country.currencySymbol} · {country.code}
                   </p>
                 </div>
-                <button className="ghost-btn small" onClick={() => onCountryDelete(country._id || country.id)}>
-                  Remove
+                <button
+                  className="ghost-btn small"
+                  onClick={() => onCountryDelete(country._id || country.id)}
+                  disabled={actionLoading.countryDelete === (country._id || country.id)}>
+                  {actionLoading.countryDelete === (country._id || country.id) ? (
+                    <span className="button-content">
+                      <LoadingDots />
+                      <span>Removing</span>
+                    </span>
+                  ) : (
+                    'Remove'
+                  )}
                 </button>
               </div>
             ))}
@@ -151,8 +194,15 @@ function SettingsPage({
               </select>
             </label>
           ))}
-          <button className="primary-btn" onClick={() => onPlatformSave(activeTab)}>
-            Save {activeTab} Settings
+          <button className="primary-btn" onClick={() => onPlatformSave(activeTab)} disabled={actionLoading.platformSave === activeTab}>
+            {actionLoading.platformSave === activeTab ? (
+              <span className="button-content">
+                <LoadingDots />
+                <span>{`Saving ${activeTab}`}</span>
+              </span>
+            ) : (
+              `Save ${activeTab} Settings`
+            )}
           </button>
         </div>
       ) : null}

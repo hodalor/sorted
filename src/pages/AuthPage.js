@@ -5,9 +5,11 @@ function AuthPage({
   loginForm,
   signupForm,
   authLoading,
+  otpCooldown,
   recaptchaRenderKey,
   showRecaptcha,
   statusMessage,
+  onResendOtp,
   onLoginChange,
   onSignupChange,
   onLogin,
@@ -122,8 +124,23 @@ function AuthPage({
             value={signupForm.otpCode}
             onChange={onSignupChange}
           />
+          {otpProvider === 'firebase' && showRecaptcha ? (
+            <div key={recaptchaRenderKey} id="firebase-recaptcha" className="firebase-recaptcha" />
+          ) : null}
           <button className="primary-btn full" onClick={onVerifyOtp} disabled={authLoading.verifyOtp}>
             {authLoading.verifyOtp ? 'Verifying...' : 'Verify phone'}
+          </button>
+          <button
+            className="ghost-btn full"
+            onClick={onResendOtp}
+            disabled={authLoading.requestOtp || otpCooldown > 0}>
+            {authLoading.requestOtp
+              ? otpProvider === 'firebase'
+                ? 'Waiting for reCAPTCHA...'
+                : 'Generating OTP...'
+              : otpCooldown > 0
+                ? `Resend OTP in ${otpCooldown}s`
+                : 'Resend OTP'}
           </button>
         </div>
       ) : null}

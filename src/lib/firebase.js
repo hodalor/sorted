@@ -97,6 +97,14 @@ export const getFirebasePhoneErrorMessage = (error) => {
     return 'Firebase phone verification is temporarily restricted for this project, number, region, or quota. Wait and try again later, or switch to system OTP in General settings.';
   }
 
+  if (message.includes('invalid-verification-code')) {
+    return 'The OTP code is incorrect. Check the SMS code and try again.';
+  }
+
+  if (message.includes('code-expired') || message.includes('session-expired')) {
+    return 'The OTP code has expired. Request a new code and try again.';
+  }
+
   return message;
 };
 

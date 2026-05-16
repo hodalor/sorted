@@ -82,6 +82,7 @@ function App() {
   const [statusMessage, setStatusMessage] = useState('Use phone number and 4-digit PIN to continue.');
   const [showRecaptcha, setShowRecaptcha] = useState(false);
   const [recaptchaRenderKey, setRecaptchaRenderKey] = useState(0);
+  const [otpCooldown, setOtpCooldown] = useState(0);
   const recaptchaVerifierRef = useRef(null);
   const phoneConfirmationRef = useRef(null);
   const pendingFirebasePhoneRef = useRef('');
@@ -194,6 +195,18 @@ function App() {
   }, []);
 
   useEffect(() => {
+    if (!otpCooldown) {
+      return undefined;
+    }
+
+    const timer = window.setTimeout(() => {
+      setOtpCooldown((current) => Math.max(0, current - 1));
+    }, 1000);
+
+    return () => window.clearTimeout(timer);
+  }, [otpCooldown]);
+
+  useEffect(() => {
     if (authStep !== 'signup-phone' || !showRecaptcha || authSettings.otpProvider !== 'firebase') {
       return undefined;
     }
@@ -237,9 +250,11 @@ function App() {
               setSignupForm((current) => ({
                 ...current,
                 phoneNumber: pendingFirebasePhoneRef.current,
+                otpCode: '',
                 otpToken: '',
               }));
               setAuthStep('signup-otp');
+              setOtpCooldown(30);
               setShowRecaptcha(false);
               setStatusMessage('Verification code sent to your phone.');
             } catch (error) {
@@ -345,6 +360,8 @@ function App() {
       setSignupForm((current) => ({
         ...current,
         phoneNumber: fullPhoneNumber,
+        otpCode: '',
+        verificationToken: '',
       }));
 
       if (authSettings.otpProvider === 'system') {
@@ -355,9 +372,11 @@ function App() {
         setSignupForm((current) => ({
           ...current,
           phoneNumber: fullPhoneNumber,
+          otpCode: '',
           otpToken: response.otpToken,
         }));
         setAuthStep('signup-otp');
+        setOtpCooldown(30);
         setStatusMessage(`System OTP: ${response.otpCode}`);
         setAuthLoading((current) => ({ ...current, requestOtp: false }));
         return;
@@ -369,6 +388,9 @@ function App() {
       resetPhoneRecaptcha();
       setRecaptchaRenderKey((current) => current + 1);
       setShowRecaptcha(true);
+      if (authStep !== 'signup-otp') {
+        setAuthStep('signup-phone');
+      }
       setStatusMessage('Complete the reCAPTCHA below to send the OTP.');
     } catch (error) {
       setStatusMessage(getFirebasePhoneErrorMessage(error));
@@ -580,9 +602,11 @@ function App() {
             loginForm={loginForm}
             signupForm={signupForm}
             authLoading={authLoading}
+            otpCooldown={otpCooldown}
             recaptchaRenderKey={recaptchaRenderKey}
             showRecaptcha={showRecaptcha}
             statusMessage={statusMessage}
+            onResendOtp={handleRequestOtp}
             onLoginChange={handleLoginChange}
             onSignupChange={handleSignupChange}
             onLogin={handleLogin}
@@ -594,6 +618,7 @@ function App() {
                 phoneConfirmationRef.current = null;
                 recaptchaVerifierRef.current = null;
                 setShowRecaptcha(false);
+                setOtpCooldown(0);
                 setAuthLoading((current) => ({ ...current, requestOtp: false }));
                 setSignupForm((current) => ({
                   ...current,

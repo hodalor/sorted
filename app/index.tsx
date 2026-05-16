@@ -36,6 +36,19 @@ export default function AuthScreen() {
   const [message, setMessage] = useState('Login with phone number and 4-digit PIN.');
   const phoneConfirmationRef = useRef<FirebaseAuthTypes.ConfirmationResult | null>(null);
   const otpLength = otpProvider === 'firebase' ? 6 : 4;
+  const [otpCooldown, setOtpCooldown] = useState(0);
+
+  useEffect(() => {
+    if (!otpCooldown) {
+      return undefined;
+    }
+
+    const timer = setTimeout(() => {
+      setOtpCooldown((current) => Math.max(0, current - 1));
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [otpCooldown]);
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -73,15 +86,24 @@ export default function AuthScreen() {
         });
         setSignupForm((current) => ({
           ...current,
+          otpCode: '',
+          verificationToken: '',
           otpToken: response.otpToken,
         }));
         setStep('signup-otp');
+        setOtpCooldown(30);
         setMessage(`System OTP: ${response.otpCode}`);
         return;
       }
 
       phoneConfirmationRef.current = await requestPhoneVerification(signupForm.phoneNumber);
+      setSignupForm((current) => ({
+        ...current,
+        otpCode: '',
+        verificationToken: '',
+      }));
       setStep('signup-otp');
+      setOtpCooldown(30);
       setMessage('Verification code sent to your phone.');
     } catch (error) {
       setMessage(getFirebasePhoneErrorMessage(error, 'Could not request OTP.'));
@@ -232,6 +254,29 @@ export default function AuthScreen() {
             <TouchableOpacity style={styles.primaryButton} onPress={handleVerifyOtp}>
               <Text style={styles.primaryButtonText}>Verify phone</Text>
             </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.secondaryButton, otpCooldown > 0 ? styles.disabledButton : null]}
+              onPress={handleRequestOtp}
+              disabled={otpCooldown > 0}>
+              <Text style={styles.secondaryButtonText}>
+                {otpCooldown > 0 ? `Resend OTP in ${otpCooldown}s` : 'Resend OTP'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.secondaryButton}
+              onPress={() => {
+                phoneConfirmationRef.current = null;
+                setOtpCooldown(0);
+                setSignupForm((current) => ({
+                  ...current,
+                  otpCode: '',
+                  otpToken: '',
+                  verificationToken: '',
+                }));
+                setStep('signup-phone');
+              }}>
+              <Text style={styles.secondaryButtonText}>Back</Text>
+            </TouchableOpacity>
           </View>
         ) : null}
 
@@ -344,6 +389,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: 'rgba(148, 163, 184, 0.24)',
+  },
+  disabledButton: {
+    opacity: 0.65,
   },
   secondaryButtonText: {
     color: '#93c5fd',

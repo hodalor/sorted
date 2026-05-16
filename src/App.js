@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { apiGet, apiPatch, apiPost } from './api';
 import BottomNav from './components/BottomNav';
+import LoadingDots from './components/LoadingDots';
+import Toast from './components/Toast';
 import {
   clearFirebaseWebSession,
   confirmPhoneVerificationCode,
@@ -32,7 +34,7 @@ const providerDefaults = {
   businessName: '',
   isRegisteredBusiness: 'no',
   registrationNumber: '',
-  category: 'Mechanic',
+  category: '',
   serviceTitle: '',
   city: 'Accra',
   rate: '',
@@ -54,8 +56,8 @@ function App() {
   const [activeMenu, setActiveMenu] = useState('home');
   const [loginForm, setLoginForm] = useState({
     countryCode: '+233',
-    phoneNumber: '240000001',
-    pin: '1234',
+    phoneNumber: '',
+    pin: '',
   });
   const [signupForm, setSignupForm] = useState(signupDefaults);
   const [countryOptions, setCountryOptions] = useState(defaultCountryOptions);
@@ -67,6 +69,7 @@ function App() {
     completeSignup: false,
   });
   const [session, setSession] = useState(null);
+  const [toast, setToast] = useState(null);
   const [search, setSearch] = useState('');
   const [categories, setCategories] = useState([]);
   const [providers, setProviders] = useState([]);
@@ -79,13 +82,38 @@ function App() {
     bio: '',
     serviceTitle: '',
   });
-  const [statusMessage, setStatusMessage] = useState('Use phone number and 4-digit PIN to continue.');
+  const [statusMessage, setStatusMessage] = useState('');
+  const [portalLoading, setPortalLoading] = useState(false);
   const [showRecaptcha, setShowRecaptcha] = useState(false);
   const [recaptchaRenderKey, setRecaptchaRenderKey] = useState(0);
   const [otpCooldown, setOtpCooldown] = useState(0);
+  const [actionLoading, setActionLoading] = useState({
+    quickBookingId: '',
+    submitProvider: false,
+    saveProviderSettings: false,
+    providerBookingKey: '',
+    logout: false,
+  });
   const recaptchaVerifierRef = useRef(null);
   const phoneConfirmationRef = useRef(null);
   const pendingFirebasePhoneRef = useRef('');
+  const showToast = (type, message, title) => {
+    setStatusMessage(message);
+    setToast({
+      id: Date.now(),
+      type,
+      title:
+        title ||
+        {
+          success: 'Success',
+          error: 'Error',
+          warning: 'Warning',
+          info: 'Notice',
+        }[type] ||
+        'Notice',
+      message,
+    });
+  };
   const formatPhoneNumber = (countryCode, value) => {
     const trimmedValue = value.trim();
 
@@ -113,12 +141,13 @@ function App() {
     );
   }, [providers, search]);
 
-  const loadPortalData = async (activeSession) => {
+  const loadPortalData = useCallback(async (activeSession) => {
     if (!activeSession?.user) {
       return;
     }
 
     try {
+      setPortalLoading(true);
       const requests = [
         apiGet('/services/categories'),
         apiGet('/services/providers?status=approved'),
@@ -131,10 +160,20 @@ function App() {
 
       const [categoryData, providerData, bookingData, providerAccountData] = await Promise.all(requests);
 
-      setCategories(categoryData.items);
-      setProviders(providerData.items);
-      setBookings(bookingData.items);
+      const nextCategories = categoryData.items || [];
+      const nextProviders = providerData.items || [];
+      const nextBookings = bookingData.items || [];
+
+      setCategories(nextCategories);
+      setProviders(nextProviders);
+      setBookings(nextBookings);
       setProviderAccount(providerAccountData || null);
+      setProviderForm((current) => ({
+        ...current,
+        category: nextCategories.some((item) => item.name === current.category)
+          ? current.category
+          : nextCategories[0]?.name || '',
+      }));
 
       if (providerAccountData?.provider) {
         setProviderEditor({
@@ -144,18 +183,30 @@ function App() {
           serviceTitle: providerAccountData.provider.serviceTitle || '',
         });
       }
-
-      setStatusMessage('Account synced successfully.');
     } catch (error) {
-      setStatusMessage(error.message);
+      showToast('error', error.message);
+    } finally {
+      setPortalLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (!toast) {
+      return undefined;
+    }
+
+    const timer = window.setTimeout(() => {
+      setToast(null);
+    }, 4200);
+
+    return () => window.clearTimeout(timer);
+  }, [toast]);
 
   useEffect(() => {
     if (session?.user) {
       loadPortalData(session);
     }
-  }, [session]);
+  }, [loadPortalData, session]);
 
   useEffect(() => {
     const loadAuthSetup = async () => {
@@ -207,7 +258,7 @@ function App() {
   }, [otpCooldown]);
 
   useEffect(() => {
-    if (authStep !== 'signup-phone' || !showRecaptcha || authSettings.otpProvider !== 'firebase') {
+    if ((authStep !== 'signup-phone' && authStep !== 'signup-otp') || !showRecaptcha || authSettings.otpProvider !== 'firebase') {
       return undefined;
     }
 
@@ -256,10 +307,10 @@ function App() {
               setAuthStep('signup-otp');
               setOtpCooldown(30);
               setShowRecaptcha(false);
-              setStatusMessage('Verification code sent to your phone.');
+              showToast('success', 'Verification code sent to your phone.', 'OTP Sent');
             } catch (error) {
               if (isMounted) {
-                setStatusMessage(getFirebasePhoneErrorMessage(error));
+                showToast('error', getFirebasePhoneErrorMessage(error));
                 setShowRecaptcha(false);
               }
             } finally {
@@ -272,7 +323,7 @@ function App() {
           },
           'expired-callback': () => {
             if (isMounted) {
-              setStatusMessage('reCAPTCHA expired. Click Request OTP again.');
+              showToast('warning', 'reCAPTCHA expired. Click Request OTP again.');
               setShowRecaptcha(false);
               setAuthLoading((current) => ({ ...current, requestOtp: false }));
               recaptchaVerifierRef.current = null;
@@ -338,10 +389,14 @@ function App() {
         pin: loginForm.pin,
       });
       setSession(response);
-      setStatusMessage(response.message);
+      showToast('success', response.message);
       setAuthStep('portal');
+      setLoginForm((current) => ({
+        ...current,
+        pin: '',
+      }));
     } catch (error) {
-      setStatusMessage(error.message);
+      showToast('error', error.message);
     } finally {
       setAuthLoading((current) => ({ ...current, login: false }));
     }
@@ -351,7 +406,7 @@ function App() {
     const fullPhoneNumber = formatPhoneNumber(signupForm.countryCode, signupForm.phoneNumber);
 
     if (!fullPhoneNumber || fullPhoneNumber.length < 10) {
-      setStatusMessage('Enter a valid phone number first.');
+      showToast('warning', 'Enter a valid phone number first.');
       return;
     }
 
@@ -377,7 +432,7 @@ function App() {
         }));
         setAuthStep('signup-otp');
         setOtpCooldown(30);
-        setStatusMessage(`System OTP: ${response.otpCode}`);
+        showToast('info', `System OTP: ${response.otpCode}`, 'OTP Ready');
         setAuthLoading((current) => ({ ...current, requestOtp: false }));
         return;
       }
@@ -391,9 +446,9 @@ function App() {
       if (authStep !== 'signup-otp') {
         setAuthStep('signup-phone');
       }
-      setStatusMessage('Complete the reCAPTCHA below to send the OTP.');
+      showToast('info', 'Complete the reCAPTCHA below to send the OTP.', 'Verification');
     } catch (error) {
-      setStatusMessage(getFirebasePhoneErrorMessage(error));
+      showToast('error', getFirebasePhoneErrorMessage(error));
       setAuthLoading((current) => ({ ...current, requestOtp: false }));
     }
   };
@@ -413,7 +468,7 @@ function App() {
         });
       } else {
         if (!phoneConfirmationRef.current) {
-          setStatusMessage('Request a verification code first.');
+          showToast('warning', 'Request a verification code first.');
           return;
         }
 
@@ -430,9 +485,9 @@ function App() {
         verificationToken: response.verificationToken,
       }));
       setAuthStep('signup-profile');
-      setStatusMessage(response.message);
+      showToast('success', response.message, 'Phone Verified');
     } catch (error) {
-      setStatusMessage(getFirebasePhoneErrorMessage(error));
+      showToast('error', getFirebasePhoneErrorMessage(error));
     } finally {
       setAuthLoading((current) => ({ ...current, verifyOtp: false }));
     }
@@ -451,7 +506,7 @@ function App() {
       });
 
       setSession(response);
-      setStatusMessage(response.message);
+      showToast('success', response.message);
       setAuthStep('portal');
       phoneConfirmationRef.current = null;
       recaptchaVerifierRef.current = null;
@@ -459,7 +514,7 @@ function App() {
       resetPhoneRecaptcha();
       await clearFirebaseWebSession();
     } catch (error) {
-      setStatusMessage(error.message);
+      showToast('error', error.message);
     } finally {
       setAuthLoading((current) => ({ ...current, completeSignup: false }));
     }
@@ -468,10 +523,14 @@ function App() {
   const handleQuickBooking = async (provider) => {
     try {
       if (!session?.user?.permissions?.canBook) {
-        setStatusMessage('Complete account setup before booking a service.');
+        showToast('warning', 'Complete account setup before booking a service.');
         return;
       }
 
+      setActionLoading((current) => ({
+        ...current,
+        quickBookingId: provider.id || provider._id,
+      }));
       const response = await apiPost('/bookings', {
         serviceId: provider.serviceId,
         providerId: provider.id || provider._id,
@@ -483,14 +542,23 @@ function App() {
       });
 
       setBookings((current) => [response.booking, ...current]);
-      setStatusMessage(`Booked ${provider.name} successfully.`);
+      showToast('success', `Booked ${provider.name} successfully.`);
     } catch (error) {
-      setStatusMessage(error.message);
+      showToast('error', error.message);
+    } finally {
+      setActionLoading((current) => ({
+        ...current,
+        quickBookingId: '',
+      }));
     }
   };
 
   const handleProviderSubmit = async () => {
     try {
+      setActionLoading((current) => ({
+        ...current,
+        submitProvider: true,
+      }));
       const response = await apiPost('/providers', {
         userId: session.user.id,
         name: session.user.name,
@@ -535,9 +603,14 @@ function App() {
 
       setSession(nextSession);
       setProviderForm(providerDefaults);
-      setStatusMessage('Provider profile submitted. Wait for KYC approval before offering services.');
+      showToast('success', 'Provider profile submitted. Wait for KYC approval before offering services.');
     } catch (error) {
-      setStatusMessage(error.message);
+      showToast('error', error.message);
+    } finally {
+      setActionLoading((current) => ({
+        ...current,
+        submitProvider: false,
+      }));
     }
   };
 
@@ -547,6 +620,10 @@ function App() {
         return;
       }
 
+      setActionLoading((current) => ({
+        ...current,
+        saveProviderSettings: true,
+      }));
       const providerId = providerAccount.provider.id || providerAccount.provider._id;
       const response = await apiPatch(`/providers/${providerId}/settings`, {
         rate: Number(providerEditor.rate),
@@ -566,14 +643,23 @@ function App() {
             }
           : current
       );
-      setStatusMessage(response.message);
+      showToast('success', response.message);
     } catch (error) {
-      setStatusMessage(error.message);
+      showToast('error', error.message);
+    } finally {
+      setActionLoading((current) => ({
+        ...current,
+        saveProviderSettings: false,
+      }));
     }
   };
 
   const handleProviderBookingAction = async (bookingId, status) => {
     try {
+      setActionLoading((current) => ({
+        ...current,
+        providerBookingKey: `${bookingId}-${status}`,
+      }));
       const response = await apiPatch(`/bookings/${bookingId}/status`, { status });
       setProviderAccount((current) =>
         current
@@ -585,9 +671,40 @@ function App() {
             }
           : current
       );
-      setStatusMessage(`Booking ${status} successfully.`);
+      showToast('success', `Booking ${status} successfully.`);
     } catch (error) {
-      setStatusMessage(error.message);
+      showToast('error', error.message);
+    } finally {
+      setActionLoading((current) => ({
+        ...current,
+        providerBookingKey: '',
+      }));
+    }
+  };
+
+  const handleLogout = async () => {
+    setActionLoading((current) => ({
+      ...current,
+      logout: true,
+    }));
+    try {
+      await clearFirebaseWebSession();
+    } catch (_error) {
+      // Ignore local Firebase signout errors during logout.
+    } finally {
+      setSession(null);
+      setAuthStep('login');
+      setLoginForm((current) => ({
+        ...current,
+        phoneNumber: '',
+        pin: '',
+      }));
+      setSignupForm(signupDefaults);
+      setActionLoading((current) => ({
+        ...current,
+        logout: false,
+      }));
+      showToast('success', 'Logged out successfully.');
     }
   };
 
@@ -595,6 +712,7 @@ function App() {
     return (
       <div className="web-shell">
         <main className="mobile-frame auth-frame">
+          <Toast toast={toast} onClose={() => setToast(null)} />
           <AuthPage
             authStep={authStep}
             countryOptions={countryOptions}
@@ -638,6 +756,17 @@ function App() {
   }
 
   const renderPage = () => {
+    if (portalLoading) {
+      return (
+        <section className="section-block">
+          <div className="loading-panel">
+            <LoadingDots />
+            <p>Loading live data</p>
+          </div>
+        </section>
+      );
+    }
+
     switch (activeMenu) {
       case 'bookings':
         return <BookingsPage bookings={bookings} />;
@@ -645,9 +774,11 @@ function App() {
         return (
           <ProviderPage
             session={session}
+            categories={categories}
             providerForm={providerForm}
             providerAccount={providerAccount}
             providerEditor={providerEditor}
+            actionLoading={actionLoading}
             onProviderChange={handleProviderChange}
             onProviderEditorChange={handleProviderEditorChange}
             onSubmitProvider={handleProviderSubmit}
@@ -656,15 +787,17 @@ function App() {
           />
         );
       case 'profile':
-        return <ProfilePage session={session} onLogout={() => setSession(null)} />;
+        return <ProfilePage session={session} isLoggingOut={actionLoading.logout} onLogout={handleLogout} />;
       case 'home':
       default:
         return (
           <HomePage
             session={session}
+            portalLoading={portalLoading}
             search={search}
             categories={categories}
             providers={filteredProviders}
+            bookingProviderId={actionLoading.quickBookingId}
             onSearchChange={(event) => setSearch(event.target.value)}
             onBook={handleQuickBooking}
           />
@@ -675,8 +808,8 @@ function App() {
   return (
     <div className="web-shell">
       <main className="mobile-frame">
-        {renderPage()}
-        <p className="status-banner">{statusMessage}</p>
+        <Toast toast={toast} onClose={() => setToast(null)} />
+        <div className="page-scroll-area">{renderPage()}</div>
         <BottomNav activeMenu={activeMenu} onChange={setActiveMenu} />
       </main>
     </div>

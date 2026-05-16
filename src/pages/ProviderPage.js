@@ -1,8 +1,12 @@
+import LoadingDots from '../components/LoadingDots';
+
 function ProviderPage({
   session,
+  categories,
   providerForm,
   providerAccount,
   providerEditor,
+  actionLoading,
   onProviderChange,
   onProviderEditorChange,
   onSubmitProvider,
@@ -38,7 +42,17 @@ function ProviderPage({
               onChange={onProviderChange}
             />
           ) : null}
-          <input name="category" type="text" placeholder="Category" value={providerForm.category} onChange={onProviderChange} />
+          <select name="category" value={providerForm.category} onChange={onProviderChange}>
+            {categories.length ? (
+              categories.map((category) => (
+                <option key={category._id || category.id || category.name} value={category.name}>
+                  {category.name}
+                </option>
+              ))
+            ) : (
+              <option value="">No categories available</option>
+            )}
+          </select>
           <input
             name="serviceTitle"
             type="text"
@@ -89,9 +103,20 @@ function ProviderPage({
             value={providerForm.availability}
             onChange={onProviderChange}
           />
-          <button className="primary-btn full" onClick={onSubmitProvider}>
-            Submit KYC
+          <button
+            className="primary-btn full"
+            onClick={onSubmitProvider}
+            disabled={actionLoading.submitProvider || !categories.length}>
+            {actionLoading.submitProvider ? (
+              <span className="button-content">
+                <LoadingDots />
+                <span>Submitting KYC</span>
+              </span>
+            ) : (
+              'Submit KYC'
+            )}
           </button>
+          {!categories.length ? <div className="empty-state">Create categories in admin before provider onboarding.</div> : null}
         </div>
       ) : null}
 
@@ -129,35 +154,72 @@ function ProviderPage({
               onChange={onProviderEditorChange}
             />
             <textarea name="bio" placeholder="Description" value={providerEditor.bio} onChange={onProviderEditorChange} />
-            <button className="primary-btn full" onClick={onSaveProviderSettings}>
-              Save provider settings
+            <button
+              className="primary-btn full"
+              onClick={onSaveProviderSettings}
+              disabled={actionLoading.saveProviderSettings}>
+              {actionLoading.saveProviderSettings ? (
+                <span className="button-content">
+                  <LoadingDots />
+                  <span>Saving settings</span>
+                </span>
+              ) : (
+                'Save provider settings'
+              )}
             </button>
           </div>
 
-          <div className="provider-booking-stack">
-            {(providerAccount.bookings || []).map((booking) => {
-              const bookingId = booking._id || booking.id;
-              return (
-                <div className="provider-booking-card" key={bookingId}>
-                  <div>
-                    <strong>{booking.serviceTitle}</strong>
-                    <p>
-                      {booking.seekerName} • {booking.date} • {booking.time}
-                    </p>
+          {(providerAccount.bookings || []).length ? (
+            <div className="provider-booking-stack">
+              {(providerAccount.bookings || []).map((booking) => {
+                const bookingId = booking._id || booking.id;
+                const confirming = actionLoading.providerBookingKey === `${bookingId}-confirmed`;
+                const rejecting = actionLoading.providerBookingKey === `${bookingId}-cancelled`;
+
+                return (
+                  <div className="provider-booking-card" key={bookingId}>
+                    <div>
+                      <strong>{booking.serviceTitle}</strong>
+                      <p>
+                        {booking.seekerName} • {booking.date} • {booking.time}
+                      </p>
+                    </div>
+                    <div className="provider-booking-actions">
+                      <span className={`pill ${booking.status}`}>{booking.status}</span>
+                      <button
+                        className="ghost-btn small"
+                        onClick={() => onBookingAction(bookingId, 'confirmed')}
+                        disabled={confirming || rejecting}>
+                        {confirming ? (
+                          <span className="button-content">
+                            <LoadingDots />
+                            <span>Accepting</span>
+                          </span>
+                        ) : (
+                          'Accept'
+                        )}
+                      </button>
+                      <button
+                        className="ghost-btn small"
+                        onClick={() => onBookingAction(bookingId, 'cancelled')}
+                        disabled={confirming || rejecting}>
+                        {rejecting ? (
+                          <span className="button-content">
+                            <LoadingDots />
+                            <span>Rejecting</span>
+                          </span>
+                        ) : (
+                          'Reject'
+                        )}
+                      </button>
+                    </div>
                   </div>
-                  <div className="provider-booking-actions">
-                    <span className={`pill ${booking.status}`}>{booking.status}</span>
-                    <button className="ghost-btn small" onClick={() => onBookingAction(bookingId, 'confirmed')}>
-                      Accept
-                    </button>
-                    <button className="ghost-btn small" onClick={() => onBookingAction(bookingId, 'cancelled')}>
-                      Reject
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="empty-state">No provider bookings yet.</div>
+          )}
         </div>
       ) : null}
     </section>

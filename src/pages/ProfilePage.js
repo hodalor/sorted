@@ -1,4 +1,6 @@
-function ProfilePage({ session, onLogout }) {
+import LoadingDots from '../components/LoadingDots';
+
+function ProfilePage({ session, isLoggingOut, onLogout }) {
   return (
     <section className="section-block">
       <div className="section-heading">
@@ -23,8 +25,15 @@ function ProfilePage({ session, onLogout }) {
           <strong>Provider</strong>
           <span>{session.user.providerProfile?.status || 'No provider profile yet'}</span>
         </div>
-        <button className="ghost-btn" onClick={onLogout}>
-          Log out
+        <button className="ghost-btn" onClick={onLogout} disabled={isLoggingOut}>
+          {isLoggingOut ? (
+            <span className="button-content">
+              <LoadingDots />
+              <span>Logging out</span>
+            </span>
+          ) : (
+            'Log out'
+          )}
         </button>
       </div>
     </section>

@@ -1,3 +1,5 @@
+import LoadingDots from '../components/LoadingDots';
+
 function AuthPage({
   authStep,
   countryOptions,
@@ -24,10 +26,6 @@ function AuthPage({
     <section className="auth-screen">
       <p className="eyebrow">Sorted</p>
       <h1>{authStep === 'login' ? 'Login' : authStep === 'signup-phone' ? 'Sign up' : 'Create account'}</h1>
-      <p className="auth-copy">
-        Login with phone number and 4-digit PIN. New users verify phone first, then set PIN, name,
-        address, and optional email.
-      </p>
 
       {authStep === 'login' ? (
         <div className="auth-card">
@@ -57,7 +55,14 @@ function AuthPage({
             onChange={onLoginChange}
           />
           <button className="primary-btn full" onClick={onLogin} disabled={authLoading.login}>
-            {authLoading.login ? 'Logging in...' : 'Login'}
+            {authLoading.login ? (
+              <span className="button-content">
+                <LoadingDots />
+                <span>Logging in</span>
+              </span>
+            ) : (
+              'Login'
+            )}
           </button>
           <button className="text-btn" onClick={() => onStepChange('signup-phone')}>
             Sign up
@@ -67,11 +72,6 @@ function AuthPage({
 
       {authStep === 'signup-phone' ? (
         <div className="auth-card">
-          <p className="auth-hint">
-            {otpProvider === 'system'
-              ? 'Request OTP to generate a system code and verify it before entering your profile details.'
-              : 'Request OTP to load reCAPTCHA, then complete it to receive the Firebase SMS code.'}
-          </p>
           <div className="phone-input-row">
             <select name="countryCode" value={signupForm.countryCode} onChange={onSignupChange}>
               {countryOptions.map((country) => (
@@ -92,11 +92,14 @@ function AuthPage({
             <div key={recaptchaRenderKey} id="firebase-recaptcha" className="firebase-recaptcha" />
           ) : null}
           <button className="primary-btn full" onClick={onRequestOtp} disabled={authLoading.requestOtp}>
-            {authLoading.requestOtp
-              ? otpProvider === 'firebase'
-                ? 'Waiting for reCAPTCHA...'
-                : 'Generating OTP...'
-              : 'Request OTP'}
+            {authLoading.requestOtp ? (
+              <span className="button-content">
+                <LoadingDots />
+                <span>{otpProvider === 'firebase' ? 'Waiting for reCAPTCHA' : 'Generating OTP'}</span>
+              </span>
+            ) : (
+              'Request OTP'
+            )}
           </button>
           <button className="text-btn" onClick={() => onStepChange('login')}>
             Back to login
@@ -106,11 +109,6 @@ function AuthPage({
 
       {authStep === 'signup-otp' ? (
         <div className="auth-card">
-          <p className="auth-hint">
-            {otpProvider === 'system'
-              ? 'Enter the system-generated OTP shown on the screen.'
-              : 'Enter the SMS code sent by Firebase.'}
-          </p>
           <button className="text-btn inline-back" onClick={() => onStepChange('signup-phone')}>
             Back
           </button>
@@ -124,23 +122,30 @@ function AuthPage({
             value={signupForm.otpCode}
             onChange={onSignupChange}
           />
-          {otpProvider === 'firebase' && showRecaptcha ? (
-            <div key={recaptchaRenderKey} id="firebase-recaptcha" className="firebase-recaptcha" />
-          ) : null}
           <button className="primary-btn full" onClick={onVerifyOtp} disabled={authLoading.verifyOtp}>
-            {authLoading.verifyOtp ? 'Verifying...' : 'Verify phone'}
+            {authLoading.verifyOtp ? (
+              <span className="button-content">
+                <LoadingDots />
+                <span>Verifying phone</span>
+              </span>
+            ) : (
+              'Verify phone'
+            )}
           </button>
           <button
             className="ghost-btn full"
             onClick={onResendOtp}
             disabled={authLoading.requestOtp || otpCooldown > 0}>
-            {authLoading.requestOtp
-              ? otpProvider === 'firebase'
-                ? 'Waiting for reCAPTCHA...'
-                : 'Generating OTP...'
-              : otpCooldown > 0
-                ? `Resend OTP in ${otpCooldown}s`
-                : 'Resend OTP'}
+            {authLoading.requestOtp ? (
+              <span className="button-content">
+                <LoadingDots />
+                <span>{otpProvider === 'firebase' ? 'Waiting for reCAPTCHA' : 'Generating OTP'}</span>
+              </span>
+            ) : otpCooldown > 0 ? (
+              `Resend OTP in ${otpCooldown}s`
+            ) : (
+              'Resend OTP'
+            )}
           </button>
         </div>
       ) : null}
@@ -172,12 +177,19 @@ function AuthPage({
             onChange={onSignupChange}
           />
           <button className="primary-btn full" onClick={onCompleteSignup} disabled={authLoading.completeSignup}>
-            {authLoading.completeSignup ? 'Finishing signup...' : 'Finish signup'}
+            {authLoading.completeSignup ? (
+              <span className="button-content">
+                <LoadingDots />
+                <span>Finishing signup</span>
+              </span>
+            ) : (
+              'Finish signup'
+            )}
           </button>
         </div>
       ) : null}
 
-      <p className="status-banner">{statusMessage}</p>
+      {statusMessage ? <p className="status-banner">{statusMessage}</p> : null}
     </section>
   );
 }

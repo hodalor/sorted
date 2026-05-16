@@ -1,4 +1,14 @@
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+const normalizeApiBaseUrl = (value) => {
+  const trimmed = (value || '').trim().replace(/\/+$/, '');
+
+  if (!trimmed) {
+    return 'http://localhost:5000/api';
+  }
+
+  return trimmed.endsWith('/api') ? trimmed : `${trimmed}/api`;
+};
+
+const API_BASE_URL = normalizeApiBaseUrl(process.env.REACT_APP_API_URL);
 
 const handleResponse = async (response) => {
   const payload = await response.json();

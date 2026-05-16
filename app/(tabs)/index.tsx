@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
+import LoadingDots from '@/components/loading-dots';
+import ToastBanner from '@/components/toast-banner';
 import { useAuth } from '@/context/auth-context';
 import { apiGet, apiPost } from '@/lib/api';
 
@@ -25,6 +27,33 @@ export default function HomeScreen() {
     }[]
   >([]);
   const [message, setMessage] = useState('Loading services...');
+  const [toast, setToast] = useState<{
+    type: 'success' | 'error' | 'warning' | 'info';
+    title: string;
+    message: string;
+  } | null>(null);
+  const [portalLoading, setPortalLoading] = useState(false);
+  const [bookingProviderId, setBookingProviderId] = useState('');
+
+  const showToast = (
+    type: 'success' | 'error' | 'warning' | 'info',
+    nextMessage: string,
+    title?: string
+  ) => {
+    setMessage(nextMessage);
+    setToast({
+      type,
+      title:
+        title ||
+        {
+          success: 'Success',
+          error: 'Error',
+          warning: 'Warning',
+          info: 'Notice',
+        }[type],
+      message: nextMessage,
+    });
+  };
 
   const filteredProviders = useMemo(() => {
     if (!search.trim()) {
@@ -39,6 +68,18 @@ export default function HomeScreen() {
   }, [providers, search]);
 
   useEffect(() => {
+    if (!toast) {
+      return undefined;
+    }
+
+    const timer = setTimeout(() => {
+      setToast(null);
+    }, 4200);
+
+    return () => clearTimeout(timer);
+  }, [toast]);
+
+  useEffect(() => {
     if (!session?.user) {
       setMessage('Login first to book services.');
       return;
@@ -46,6 +87,7 @@ export default function HomeScreen() {
 
     const loadData = async () => {
       try {
+        setPortalLoading(true);
         const [categoryData, providerData] = await Promise.all([
           apiGet('/services/categories'),
           apiGet('/services/providers?status=approved'),
@@ -55,7 +97,9 @@ export default function HomeScreen() {
         setProviders(providerData.items);
         setMessage('Synced with shared backend.');
       } catch (error) {
-        setMessage(error instanceof Error ? error.message : 'Could not load services.');
+        showToast('error', error instanceof Error ? error.message : 'Could not load services.');
+      } finally {
+        setPortalLoading(false);
       }
     };
 
@@ -70,6 +114,7 @@ export default function HomeScreen() {
       }
 
       const providerId = provider.id || provider._id;
+      setBookingProviderId(String(providerId || ''));
 
       await apiPost('/bookings', {
         serviceId: (provider as { serviceId?: string }).serviceId,
@@ -81,9 +126,11 @@ export default function HomeScreen() {
         time: '10:00',
       });
 
-      setMessage(`Booked ${provider.name} successfully.`);
+      showToast('success', `Booked ${provider.name} successfully.`);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Could not create booking.');
+      showToast('error', error instanceof Error ? error.message : 'Could not create booking.');
+    } finally {
+      setBookingProviderId('');
     }
   };
 
@@ -101,6 +148,7 @@ export default function HomeScreen() {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+      <ToastBanner toast={toast} onClose={() => setToast(null)} />
       <View style={styles.hero}>
         <View>
           <Text style={styles.location}>Accra, Ghana</Text>
@@ -127,49 +175,81 @@ export default function HomeScreen() {
         <Text style={styles.sectionTitle}>Browse categories</Text>
       </View>
 
-      <View style={styles.grid}>
-        {categories.map((item, index) => (
-          <View key={item.name} style={styles.categoryCard}>
-            <View style={[styles.categoryIcon, { borderColor: colors[index % colors.length] }]}>
-              <Text style={[styles.categoryIconText, { color: colors[index % colors.length] }]}>
-                {item.name[0]}
-              </Text>
+      {portalLoading ? (
+        <View style={styles.loadingCard}>
+          <LoadingDots />
+          <Text style={styles.cardMeta}>Loading live data</Text>
+        </View>
+      ) : categories.length ? (
+        <View style={styles.grid}>
+          {categories.map((item, index) => (
+            <View key={item.name} style={styles.categoryCard}>
+              <View style={[styles.categoryIcon, { borderColor: colors[index % colors.length] }]}>
+                <Text style={[styles.categoryIconText, { color: colors[index % colors.length] }]}>
+                  {item.name[0]}
+                </Text>
+              </View>
+              <Text style={styles.cardTitle}>{item.name}</Text>
+              <Text style={styles.cardMeta}>{item.available} available</Text>
             </View>
-            <Text style={styles.cardTitle}>{item.name}</Text>
-            <Text style={styles.cardMeta}>{item.available} available</Text>
-          </View>
-        ))}
-      </View>
+          ))}
+        </View>
+      ) : (
+        <View style={styles.loadingCard}>
+          <Text style={styles.cardMeta}>No categories yet. Create them in admin first.</Text>
+        </View>
+      )}
 
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionEyebrow}>Featured</Text>
         <Text style={styles.sectionTitle}>Top providers</Text>
       </View>
 
-      <View style={styles.list}>
-        {filteredProviders.map((provider) => (
-          <View key={provider.name} style={styles.providerCard}>
-            <View style={styles.providerHead}>
-              <View>
-                <Text style={styles.cardTitle}>{provider.name}</Text>
-                <Text style={styles.cardMeta}>{provider.category}</Text>
-              </View>
-              <View style={styles.ratingPill}>
-                <Text style={styles.ratingText}>{provider.rating}</Text>
-              </View>
-            </View>
-            <Text style={styles.cardMeta}>{provider.bio}</Text>
-            <View style={styles.providerFooter}>
-              <Text style={styles.cardMeta}>Available today • ${provider.rate}/hr</Text>
-              <TouchableOpacity style={styles.bookButton} onPress={() => handleBooking(provider)}>
-                <Text style={styles.bookButtonText}>Book</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        ))}
-      </View>
+      {filteredProviders.length ? (
+        <View style={styles.list}>
+          {filteredProviders.map((provider) => {
+            const providerId = provider.id || provider._id;
+            const isBooking = bookingProviderId === String(providerId || '');
 
-      <Text style={styles.message}>{message}</Text>
+            return (
+              <View key={provider.name} style={styles.providerCard}>
+                <View style={styles.providerHead}>
+                  <View>
+                    <Text style={styles.cardTitle}>{provider.name}</Text>
+                    <Text style={styles.cardMeta}>{provider.category}</Text>
+                  </View>
+                  <View style={styles.ratingPill}>
+                    <Text style={styles.ratingText}>{provider.rating || '0.0'}</Text>
+                  </View>
+                </View>
+                <Text style={styles.cardMeta}>{provider.bio || 'No provider description yet.'}</Text>
+                <View style={styles.providerFooter}>
+                  <Text style={styles.cardMeta}>Available today • ${provider.rate}/hr</Text>
+                  <TouchableOpacity
+                    style={[styles.bookButton, isBooking ? styles.disabledButton : null]}
+                    onPress={() => handleBooking(provider)}
+                    disabled={isBooking || !provider.serviceId}>
+                    {isBooking ? (
+                      <View style={styles.buttonContent}>
+                        <LoadingDots />
+                        <Text style={styles.bookButtonText}>Booking</Text>
+                      </View>
+                    ) : (
+                      <Text style={styles.bookButtonText}>Book</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            );
+          })}
+        </View>
+      ) : (
+        <View style={styles.loadingCard}>
+          <Text style={styles.cardMeta}>No approved providers yet.</Text>
+        </View>
+      )}
+
+      {message ? <Text style={styles.message}>{message}</Text> : null}
     </ScrollView>
   );
 }
@@ -236,6 +316,15 @@ const styles = StyleSheet.create({
     color: '#f8fafc',
     fontSize: 16,
     paddingVertical: 4,
+  },
+  loadingCard: {
+    borderRadius: 22,
+    padding: 18,
+    backgroundColor: '#111827',
+    borderWidth: 1,
+    borderColor: 'rgba(148, 163, 184, 0.16)',
+    alignItems: 'center',
+    gap: 10,
   },
   sectionHeader: {
     marginTop: 8,
@@ -326,6 +415,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     backgroundColor: '#1d4ed8',
+  },
+  buttonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  disabledButton: {
+    opacity: 0.7,
   },
   bookButtonText: {
     color: '#eff6ff',

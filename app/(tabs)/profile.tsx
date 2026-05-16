@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
+import LoadingDots from '@/components/loading-dots';
+import ToastBanner from '@/components/toast-banner';
 import { useAuth } from '@/context/auth-context';
 import { apiGet, apiPatch, apiPost } from '@/lib/api';
 
@@ -9,7 +11,7 @@ const onboardingDefaults = {
   businessName: '',
   isRegisteredBusiness: 'no',
   registrationNumber: '',
-  category: 'Mechanic',
+  category: '',
   serviceTitle: '',
   city: 'Accra',
   rate: '',
@@ -24,12 +26,24 @@ const onboardingDefaults = {
 export default function ProfileScreen() {
   const router = useRouter();
   const { session, setSession } = useAuth();
+  const [categories, setCategories] = useState<{ id?: string; _id?: string; name: string }[]>([]);
   const [stats, setStats] = useState([
     { label: 'Bookings completed', value: '0' },
     { label: 'Visible providers', value: '0' },
     { label: 'Reviews posted', value: '0' },
   ]);
   const [message, setMessage] = useState('Manage your booking and provider account.');
+  const [toast, setToast] = useState<{
+    type: 'success' | 'error' | 'warning' | 'info';
+    title: string;
+    message: string;
+  } | null>(null);
+  const [actionLoading, setActionLoading] = useState({
+    submitProvider: false,
+    saveProviderSettings: false,
+    providerBookingKey: '',
+    logout: false,
+  });
   const [providerAccount, setProviderAccount] = useState<{
     provider?: {
       id?: string;
@@ -59,6 +73,38 @@ export default function ProfileScreen() {
     bio: '',
   });
 
+  const showToast = (
+    type: 'success' | 'error' | 'warning' | 'info',
+    nextMessage: string,
+    title?: string
+  ) => {
+    setMessage(nextMessage);
+    setToast({
+      type,
+      title:
+        title ||
+        {
+          success: 'Success',
+          error: 'Error',
+          warning: 'Warning',
+          info: 'Notice',
+        }[type],
+      message: nextMessage,
+    });
+  };
+
+  useEffect(() => {
+    if (!toast) {
+      return undefined;
+    }
+
+    const timer = setTimeout(() => {
+      setToast(null);
+    }, 4200);
+
+    return () => clearTimeout(timer);
+  }, [toast]);
+
   useEffect(() => {
     if (!session?.user) {
       router.replace('/');
@@ -71,19 +117,27 @@ export default function ProfileScreen() {
           apiGet(`/bookings?seekerPhone=${encodeURIComponent(session.user.phoneNumber)}`),
           apiGet('/reviews'),
           apiGet('/services/providers?status=approved'),
+          apiGet('/services/categories'),
         ];
 
         if (session.user.providerProfile) {
           requests.push(apiGet(`/providers/account/${session.user.id}`));
         }
 
-        const [bookingData, reviewData, providerData, providerAccountData] = await Promise.all(requests);
+        const [bookingData, reviewData, providerData, categoryData, providerAccountData] = await Promise.all(requests);
 
         setStats([
           { label: 'Bookings completed', value: String(bookingData.total) },
           { label: 'Visible providers', value: String(providerData.total) },
           { label: 'Reviews posted', value: String(reviewData.total) },
         ]);
+        setCategories(categoryData.items || []);
+        setProviderForm((current) => ({
+          ...current,
+          category: (categoryData.items || []).some((item: { name: string }) => item.name === current.category)
+            ? current.category
+            : categoryData.items?.[0]?.name || '',
+        }));
 
         if (providerAccountData) {
           setProviderAccount(providerAccountData);
@@ -97,7 +151,7 @@ export default function ProfileScreen() {
           setProviderAccount(null);
         }
       } catch (error) {
-        setMessage(error instanceof Error ? error.message : 'Could not load profile data.');
+        showToast('error', error instanceof Error ? error.message : 'Could not load profile data.');
       }
     };
 
@@ -110,6 +164,15 @@ export default function ProfileScreen() {
 
   const handleOnboarding = async () => {
     try {
+      if (!categories.length) {
+        showToast('warning', 'Create categories from admin before provider onboarding.');
+        return;
+      }
+
+      setActionLoading((current) => ({
+        ...current,
+        submitProvider: true,
+      }));
       const response = await apiPost('/providers', {
         userId: session.user.id,
         name: session.user.name,
@@ -152,9 +215,14 @@ export default function ProfileScreen() {
         },
       });
       setProviderForm(onboardingDefaults);
-      setMessage('Provider profile submitted. Wait for KYC approval.');
+      showToast('success', 'Provider profile submitted. Wait for KYC approval.');
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Could not submit provider profile.');
+      showToast('error', error instanceof Error ? error.message : 'Could not submit provider profile.');
+    } finally {
+      setActionLoading((current) => ({
+        ...current,
+        submitProvider: false,
+      }));
     }
   };
 
@@ -166,6 +234,10 @@ export default function ProfileScreen() {
         return;
       }
 
+      setActionLoading((current) => ({
+        ...current,
+        saveProviderSettings: true,
+      }));
       const response = await apiPatch(`/providers/${providerId}/settings`, {
         serviceTitle: providerEditor.serviceTitle,
         rate: Number(providerEditor.rate),
@@ -184,14 +256,23 @@ export default function ProfileScreen() {
             }
           : current
       );
-      setMessage(response.message);
+      showToast('success', response.message);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Could not update provider settings.');
+      showToast('error', error instanceof Error ? error.message : 'Could not update provider settings.');
+    } finally {
+      setActionLoading((current) => ({
+        ...current,
+        saveProviderSettings: false,
+      }));
     }
   };
 
   const handleProviderBookingAction = async (bookingId: string, status: 'confirmed' | 'cancelled') => {
     try {
+      setActionLoading((current) => ({
+        ...current,
+        providerBookingKey: `${bookingId}-${status}`,
+      }));
       const response = await apiPatch(`/bookings/${bookingId}/status`, { status });
       setProviderAccount((current) =>
         current
@@ -203,14 +284,20 @@ export default function ProfileScreen() {
             }
           : current
       );
-      setMessage(`Booking ${status} successfully.`);
+      showToast('success', `Booking ${status} successfully.`);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Could not update booking.');
+      showToast('error', error instanceof Error ? error.message : 'Could not update booking.');
+    } finally {
+      setActionLoading((current) => ({
+        ...current,
+        providerBookingKey: '',
+      }));
     }
   };
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+      <ToastBanner toast={toast} onClose={() => setToast(null)} />
       <View style={styles.profileCard}>
         <View style={styles.avatar}>
           <Text style={styles.avatarText}>{session.user.name.slice(0, 2).toUpperCase()}</Text>
@@ -259,13 +346,26 @@ export default function ProfileScreen() {
               placeholderTextColor="#64748b"
             />
           ) : null}
-          <TextInput
-            value={providerForm.category}
-            onChangeText={(category) => setProviderForm((current) => ({ ...current, category }))}
-            style={styles.input}
-            placeholder="Category"
-            placeholderTextColor="#64748b"
-          />
+          {categories.length ? (
+            <View style={styles.chipWrap}>
+              {categories.map((category) => {
+                const active = providerForm.category === category.name;
+
+                return (
+                  <TouchableOpacity
+                    key={category._id || category.id || category.name}
+                    style={[styles.categoryChip, active ? styles.categoryChipActive : null]}
+                    onPress={() => setProviderForm((current) => ({ ...current, category: category.name }))}>
+                    <Text style={[styles.categoryChipText, active ? styles.categoryChipTextActive : null]}>
+                      {category.name}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          ) : (
+            <Text style={styles.setting}>No categories yet. Create them in admin first.</Text>
+          )}
           <TextInput
             value={providerForm.serviceTitle}
             onChangeText={(serviceTitle) => setProviderForm((current) => ({ ...current, serviceTitle }))}
@@ -333,8 +433,18 @@ export default function ProfileScreen() {
             placeholder="Availability"
             placeholderTextColor="#64748b"
           />
-          <TouchableOpacity style={styles.primaryButton} onPress={handleOnboarding}>
-            <Text style={styles.primaryButtonText}>Provide service</Text>
+          <TouchableOpacity
+            style={[styles.primaryButton, actionLoading.submitProvider ? styles.disabledButton : null]}
+            onPress={handleOnboarding}
+            disabled={actionLoading.submitProvider || !categories.length}>
+            {actionLoading.submitProvider ? (
+              <View style={styles.buttonContent}>
+                <LoadingDots />
+                <Text style={styles.primaryButtonText}>Submitting KYC</Text>
+              </View>
+            ) : (
+              <Text style={styles.primaryButtonText}>Provide service</Text>
+            )}
           </TouchableOpacity>
         </View>
       ) : null}
@@ -382,12 +492,24 @@ export default function ProfileScreen() {
             placeholderTextColor="#64748b"
             multiline
           />
-          <TouchableOpacity style={styles.primaryButton} onPress={handleProviderSettings}>
-            <Text style={styles.primaryButtonText}>Save settings</Text>
+          <TouchableOpacity
+            style={[styles.primaryButton, actionLoading.saveProviderSettings ? styles.disabledButton : null]}
+            onPress={handleProviderSettings}
+            disabled={actionLoading.saveProviderSettings}>
+            {actionLoading.saveProviderSettings ? (
+              <View style={styles.buttonContent}>
+                <LoadingDots />
+                <Text style={styles.primaryButtonText}>Saving settings</Text>
+              </View>
+            ) : (
+              <Text style={styles.primaryButtonText}>Save settings</Text>
+            )}
           </TouchableOpacity>
 
-          {providerAccount.bookings?.map((booking) => {
+          {providerAccount.bookings?.length ? providerAccount.bookings.map((booking) => {
             const bookingId = booking.id || booking._id;
+            const confirming = actionLoading.providerBookingKey === `${bookingId}-confirmed`;
+            const rejecting = actionLoading.providerBookingKey === `${bookingId}-cancelled`;
             return (
               <View key={bookingId} style={styles.bookingCard}>
                 <Text style={styles.sectionTitle}>{booking.serviceTitle}</Text>
@@ -397,19 +519,35 @@ export default function ProfileScreen() {
                 <Text style={styles.setting}>Status: {booking.status}</Text>
                 <View style={styles.actionsRow}>
                   <TouchableOpacity
-                    style={styles.secondaryAction}
-                    onPress={() => handleProviderBookingAction(String(bookingId), 'confirmed')}>
-                    <Text style={styles.secondaryActionText}>Accept</Text>
+                    style={[styles.secondaryAction, confirming || rejecting ? styles.disabledButton : null]}
+                    onPress={() => handleProviderBookingAction(String(bookingId), 'confirmed')}
+                    disabled={confirming || rejecting}>
+                    {confirming ? (
+                      <View style={styles.buttonContent}>
+                        <LoadingDots />
+                        <Text style={styles.secondaryActionText}>Accepting</Text>
+                      </View>
+                    ) : (
+                      <Text style={styles.secondaryActionText}>Accept</Text>
+                    )}
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={styles.secondaryAction}
-                    onPress={() => handleProviderBookingAction(String(bookingId), 'cancelled')}>
-                    <Text style={styles.secondaryActionText}>Reject</Text>
+                    style={[styles.secondaryAction, confirming || rejecting ? styles.disabledButton : null]}
+                    onPress={() => handleProviderBookingAction(String(bookingId), 'cancelled')}
+                    disabled={confirming || rejecting}>
+                    {rejecting ? (
+                      <View style={styles.buttonContent}>
+                        <LoadingDots />
+                        <Text style={styles.secondaryActionText}>Rejecting</Text>
+                      </View>
+                    ) : (
+                      <Text style={styles.secondaryActionText}>Reject</Text>
+                    )}
                   </TouchableOpacity>
                 </View>
               </View>
             );
-          })}
+          }) : <Text style={styles.setting}>No provider bookings yet.</Text>}
         </View>
       ) : null}
 
@@ -419,12 +557,24 @@ export default function ProfileScreen() {
         <Text style={styles.setting}>Email: {session.user.email || 'Not provided'}</Text>
         <Text style={styles.setting}>Address: {session.user.address}</Text>
         <TouchableOpacity
-          style={styles.secondaryAction}
+          style={[styles.secondaryAction, actionLoading.logout ? styles.disabledButton : null]}
           onPress={() => {
+            setActionLoading((current) => ({
+              ...current,
+              logout: true,
+            }));
             setSession(null);
             router.replace('/');
-          }}>
-          <Text style={styles.secondaryActionText}>Log out</Text>
+          }}
+          disabled={actionLoading.logout}>
+          {actionLoading.logout ? (
+            <View style={styles.buttonContent}>
+              <LoadingDots />
+              <Text style={styles.secondaryActionText}>Logging out</Text>
+            </View>
+          ) : (
+            <Text style={styles.secondaryActionText}>Log out</Text>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -514,6 +664,30 @@ const styles = StyleSheet.create({
     minHeight: 100,
     textAlignVertical: 'top',
   },
+  chipWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  categoryChip: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(148, 163, 184, 0.22)',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+  },
+  categoryChipActive: {
+    borderColor: 'rgba(245, 158, 11, 0.4)',
+    backgroundColor: 'rgba(245, 158, 11, 0.14)',
+  },
+  categoryChipText: {
+    color: '#cbd5e1',
+    fontWeight: '600',
+  },
+  categoryChipTextActive: {
+    color: '#fde68a',
+  },
   sectionTitle: {
     color: '#f8fafc',
     fontSize: 18,
@@ -528,6 +702,11 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     alignItems: 'center',
     backgroundColor: '#f59e0b',
+  },
+  buttonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   primaryButtonText: {
     color: '#111827',
@@ -550,6 +729,9 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderWidth: 1,
     borderColor: 'rgba(148, 163, 184, 0.24)',
+  },
+  disabledButton: {
+    opacity: 0.7,
   },
   secondaryActionText: {
     color: '#93c5fd',

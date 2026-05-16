@@ -1,7 +1,16 @@
 import Constants from 'expo-constants';
 
-const apiBaseUrl =
-  (Constants.expoConfig?.extra?.apiBaseUrl as string | undefined) || 'http://localhost:5000/api';
+const normalizeApiBaseUrl = (value?: string) => {
+  const trimmed = (value || '').trim().replace(/\/+$/, '');
+
+  if (!trimmed) {
+    return 'http://localhost:5000/api';
+  }
+
+  return trimmed.endsWith('/api') ? trimmed : `${trimmed}/api`;
+};
+
+const apiBaseUrl = normalizeApiBaseUrl(Constants.expoConfig?.extra?.apiBaseUrl as string | undefined);
 
 const handleResponse = async (response: Response) => {
   const payload = await response.json();

@@ -29,6 +29,14 @@ export const getFirebasePhoneErrorMessage = (error: unknown, fallback: string) =
       return 'Firebase mobile config is missing. Add the Android and iOS Firebase files, then rebuild the app.';
     }
 
+    if (
+      error.message.includes('auth/error-code:-39') ||
+      error.message.includes('Error code: 39') ||
+      error.message.includes('quota-exceeded')
+    ) {
+      return 'Firebase phone verification is temporarily restricted for this project, number, region, or quota. Wait and try again later, or switch to system OTP in General settings.';
+    }
+
     return error.message;
   }
 

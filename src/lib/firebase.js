@@ -89,6 +89,14 @@ export const getFirebasePhoneErrorMessage = (error) => {
     return 'Firebase phone auth billing is not enabled for this project. Enable billing in Firebase or Google Cloud before OTP can be sent.';
   }
 
+  if (
+    message.includes('auth/error-code:-39') ||
+    message.includes('Error code: 39') ||
+    message.includes('quota-exceeded')
+  ) {
+    return 'Firebase phone verification is temporarily restricted for this project, number, region, or quota. Wait and try again later, or switch to system OTP in General settings.';
+  }
+
   return message;
 };
 
